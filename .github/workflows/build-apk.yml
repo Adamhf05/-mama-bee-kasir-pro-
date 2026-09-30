@@ -47,6 +47,9 @@ jobs:
             "build-tools;35.0.0" \
             "build-tools;34.0.0"
 
+      - name: Generate App Icon
+        run: npx capacitor-assets generate --android
+
       - name: Sync Capacitor
         run: npx cap sync android
 
