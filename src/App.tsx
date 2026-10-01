@@ -5,6 +5,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { ProdukScreen } from './screens/ProdukScreen';
 import { KasirScreen } from './screens/KasirScreen';
+import { TokoScreen } from './screens/TokoScreen';
+import { PelangganScreen } from './screens/PelangganScreen';
 
 function MainApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -62,9 +64,10 @@ function MainApp() {
         {currentMenu === 'dashboard' && <DashboardScreen />}
         {currentMenu === 'kasir' && <KasirScreen />}
         {currentMenu === 'produk' && <ProdukScreen />}
+        {currentMenu === 'toko' && <TokoScreen />}
+        {currentMenu === 'pelanggan' && <PelangganScreen />}
         {currentMenu === 'riwayat' && <div style={{ padding: '20px', color: text }}>Halaman Riwayat (Coming Soon)</div>}
         {currentMenu === 'laporan' && <div style={{ padding: '20px', color: text }}>Halaman Laporan (Coming Soon)</div>}
-        {currentMenu === 'toko' && <div style={{ padding: '20px', color: text }}>Halaman Toko (Coming Soon)</div>}
         {currentMenu === 'voice' && <div style={{ padding: '20px', color: text }}>Voice AI (Coming Soon)</div>}
       </main>
     </div>

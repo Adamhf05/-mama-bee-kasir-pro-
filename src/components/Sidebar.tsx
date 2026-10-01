@@ -14,10 +14,11 @@ export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarP
     { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
     { id: 'kasir', label: 'Kasir', icon: '🛒' },
     { id: 'produk', label: 'Produk', icon: '📦' },
+    { id: 'toko', label: 'Toko', icon: '🏪' },
+    { id: 'pelanggan', label: 'Pelanggan', icon: '👥' },
     { id: 'riwayat', label: 'Riwayat', icon: '📋' },
     { id: 'laporan', label: 'Laporan', icon: '📊' },
-    { id: 'toko', label: 'Toko', icon: '⚙️' },
-    { id: 'voice', label: 'Voice AI', icon: '🎙️' },
+    { id: 'voice', label: 'Voice AI', icon: '️' },
   ];
 
   return (
