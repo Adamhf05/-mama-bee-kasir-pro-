@@ -15,15 +15,23 @@ interface TokoData {
 }
 
 const WARNA_PIN = [
-  { value: '#2196F3', label: 'Biru' }, { value: '#4CAF50', label: 'Hijau' },
-  { value: '#F44336', label: 'Merah' }, { value: '#FF9800', label: 'Orange' },
+  { value: '#2196F3', label: 'Biru' },
+  { value: '#4CAF50', label: 'Hijau' },
+  { value: '#F44336', label: 'Merah' },
+  { value: '#FF9800', label: 'Orange' },
+  { value: '#9C27B0', label: 'Ungu' },
+  { value: '#00BCD4', label: 'Cyan' },
+  { value: '#E91E63', label: 'Pink' },
 ];
 
+// PIN BULAT SEMPURNA - TIDAK ADA BENTUK LOVE/EMOJI
 function createCustomIcon(color: string) {
   return L.divIcon({
     className: 'custom-marker',
-    html: `<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
-    iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30]
+    html: `<div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
   });
 }
 
@@ -40,22 +48,28 @@ export default function MapMarketScreen() {
   }, []);
 
   const handleSave = () => {
-    if (!currentToko.nama || !currentToko.lokasi) {
-      alert('⚠️ Nama dan Lokasi (Koordinat) wajib diisi!');
+    if (!currentToko.idToko || !currentToko.nama || !currentToko.lokasi) {
+      alert('⚠️ ID Toko, Nama, dan Lokasi (Koordinat) wajib diisi!');
       return;
     }
+    
+    if (!editId && tokoList.find(t => t.idToko === currentToko.idToko)) {
+      alert('⚠️ ID Toko sudah ada! Gunakan ID yang berbeda.');
+      return;
+    }
+    
     let updatedList;
     if (editId) {
       updatedList = tokoList.map(t => t.idToko === editId ? { ...currentToko, kunjungan: t.kunjungan } : t);
+      alert('✅ Data toko berhasil diupdate!');
     } else {
-      const newId = 'TOKO-' + String(tokoList.length + 1).padStart(4, '0');
-      updatedList = [...tokoList, { ...currentToko, idToko: newId, kunjungan: [] }];
+      updatedList = [...tokoList, { ...currentToko, kunjungan: [] }];
+      alert('✅ Toko baru berhasil ditambahkan!');
     }
     setTokoList(updatedList);
     localStorage.setItem('tokoMasterData', JSON.stringify(updatedList));
     setShowForm(false);
     setEditId(null);
-    alert('✅ Data toko berhasil disimpan di Peta!');
   };
 
   const handleDelete = (id: string) => {
@@ -63,10 +77,14 @@ export default function MapMarketScreen() {
       const updated = tokoList.filter(t => t.idToko !== id);
       setTokoList(updated);
       localStorage.setItem('tokoMasterData', JSON.stringify(updated));
+      alert('🗑️ Toko berhasil dihapus!');
     }
   };
 
-  const filteredToko = tokoList.filter(t => t.nama.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredToko = tokoList.filter(t => 
+    t.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.idToko.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div style={{ position: 'relative', height: 'calc(100vh - 60px)', width: '100%' }}>
@@ -80,7 +98,8 @@ export default function MapMarketScreen() {
               <Popup>
                 <div style={{ minWidth: '180px' }}>
                   <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-                  <p style={{ margin: '3px 0', fontSize: '12px' }}>📍 {toko.alamat}</p>
+                  <p style={{ margin: '3px 0', fontSize: '12px' }}><strong>ID:</strong> {toko.idToko}</p>
+                  <p style={{ margin: '3px 0', fontSize: '12px' }}> {toko.alamat}</p>
                   <p style={{ margin: '3px 0', fontSize: '12px' }}>📞 {toko.telepon}</p>
                   <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
                     <button onClick={() => { setCurrentToko(toko); setEditId(toko.idToko); setShowForm(true); }} style={{ flex: 1, padding: '6px', background: '#FFC107', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>✏️ Edit</button>
@@ -106,11 +125,59 @@ export default function MapMarketScreen() {
       {showForm && (
         <div style={{ position: 'absolute', top: '0', left: '0', right: '0', bottom: '0', background: 'white', zIndex: 2000, overflowY: 'auto', padding: '20px' }}>
           <h2 style={{ color: '#1976D2' }}>{editId ? 'Edit Data Toko' : 'Tambah Toko Baru'}</h2>
-          <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Nama Toko</label><input type="text" value={currentToko.nama} onChange={(e) => setCurrentToko({...currentToko, nama: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} /></div>
-          <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Alamat</label><textarea value={currentToko.alamat} onChange={(e) => setCurrentToko({...currentToko, alamat: e.target.value})} rows={2} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} /></div>
-          <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>No. Telepon</label><input type="tel" value={currentToko.telepon} onChange={(e) => setCurrentToko({...currentToko, telepon: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} /></div>
-          <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Koordinat (Lat,Lng)</label><input type="text" value={currentToko.lokasi} onChange={(e) => setCurrentToko({...currentToko, lokasi: e.target.value})} placeholder="-3.3198, 114.5908" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} /><small style={{color:'#666'}}>Copy dari Google Maps</small></div>
-          <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Warna Pin</label><div style={{ display: 'flex', gap: '10px' }}>{WARNA_PIN.map(w => (<button key={w.value} onClick={() => setCurrentToko({...currentToko, warnaPin: w.value})} style={{ width: '40px', height: '40px', background: w.value, border: currentToko.warnaPin === w.value ? '3px solid #000' : '2px solid #ddd', borderRadius: '50%', cursor: 'pointer' }} />))}</div></div>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>ID Toko (Unik)</label>
+            <input type="text" value={currentToko.idToko} onChange={(e) => setCurrentToko({...currentToko, idToko: e.target.value})} placeholder="Contoh: TOKO-001, BDG-01, KAL-123" style={{ width: '100%', padding: '10px', border: '2px solid #1976D2', borderRadius: '8px', boxSizing: 'border-box', background: '#E3F2FD', fontWeight: 'bold' }} />
+            <small style={{color:'#666'}}>ID unik untuk identifikasi toko (bebas)</small>
+          </div>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Nama Toko</label>
+            <input type="text" value={currentToko.nama} onChange={(e) => setCurrentToko({...currentToko, nama: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} />
+          </div>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Alamat</label>
+            <textarea value={currentToko.alamat} onChange={(e) => setCurrentToko({...currentToko, alamat: e.target.value})} rows={2} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} />
+          </div>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>No. Telepon</label>
+            <input type="tel" value={currentToko.telepon} onChange={(e) => setCurrentToko({...currentToko, telepon: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} />
+          </div>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Koordinat (Lat,Lng)</label>
+            <input type="text" value={currentToko.lokasi} onChange={(e) => setCurrentToko({...currentToko, lokasi: e.target.value})} placeholder="-3.3198, 114.5908" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }} />
+            <small style={{color:'#666'}}>Copy dari Google Maps</small>
+          </div>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Warna Pin (7 Pilihan - Semua Bulat)</label>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', padding: '10px 0' }}>
+              {WARNA_PIN.map(w => (
+                <div key={w.value} style={{ textAlign: 'center' }}>
+                  <button 
+                    onClick={() => setCurrentToko({...currentToko, warnaPin: w.value})} 
+                    style={{ 
+                      width: '55px', 
+                      height: '55px', 
+                      background: w.value, 
+                      border: currentToko.warnaPin === w.value ? '4px solid #000' : '3px solid #ddd', 
+                      borderRadius: '50%', 
+                      cursor: 'pointer',
+                      transform: currentToko.warnaPin === w.value ? 'scale(1.15)' : 'scale(1)',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                    }} 
+                    title={w.label} 
+                  />
+                  <div style={{ fontSize: '11px', marginTop: '5px', color: '#666', fontWeight: currentToko.warnaPin === w.value ? 'bold' : 'normal' }}>{w.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
           <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
             <button onClick={handleSave} style={{ flex: 1, padding: '12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>💾 Simpan</button>
             <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>Batal</button>
