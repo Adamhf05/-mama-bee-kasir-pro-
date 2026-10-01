@@ -1,11 +1,5 @@
 import { useState, useEffect } from 'react';
-
-interface Kunjungan {
-  tanggal: string;
-  tipe: 'Cash' | 'Credit';
-  nominal: number;
-  catatan: string;
-}
+import { Browser } from '@capacitor/browser';
 
 interface TokoData {
   idToko: string;
@@ -13,9 +7,7 @@ interface TokoData {
   alamat: string;
   telepon: string;
   lokasi: string;
-  folder: string;
   warnaPin: string;
-  kunjungan: Kunjungan[];
 }
 
 export default function TokoScreen() {
@@ -35,8 +27,11 @@ export default function TokoScreen() {
   }, []);
 
   const handleStartTransaction = () => {
-    alert('🚀 Fitur Transaksi (Kasir & Produk) akan segera terhubung di sini!\n\nNanti sales bisa pilih barang, hitung total, dan pilih Cash/Credit.');
-    // Nanti di Milestone 4, ini akan redirect ke halaman Kasir dengan ID toko ini
+    alert('🚀 Fitur Transaksi (Kasir & Produk) akan segera terhubung!\n\nNanti sales bisa pilih barang, hitung total, dan pilih Cash/Credit.');
+  };
+
+  const handleNavigate = (lokasi: string) => {
+    Browser.open({ url: `https://www.google.com/maps/dir/?api=1&destination=${lokasi}` });
   };
 
   const filteredToko = tokoList.filter(t =>
@@ -44,11 +39,7 @@ export default function TokoScreen() {
     t.nama.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- TAMPILAN DETAIL TOKO ---
   if (selectedToko) {
-    const totalCash = selectedToko.kunjungan.filter(k => k.tipe === 'Cash').reduce((sum, k) => sum + k.nominal, 0);
-    const totalCredit = selectedToko.kunjungan.filter(k => k.tipe === 'Credit').reduce((sum, k) => sum + k.nominal, 0);
-
     return (
       <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
         <button 
@@ -63,55 +54,36 @@ export default function TokoScreen() {
           <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}><strong>ID:</strong> {selectedToko.idToko}</p>
           <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>📍 {selectedToko.alamat}</p>
           <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>📞 {selectedToko.telepon}</p>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>🗺️ Koordinat: {selectedToko.lokasi}</p>
           <div style={{ marginTop: '10px', padding: '6px 12px', background: selectedToko.warnaPin, color: 'white', borderRadius: '6px', fontSize: '12px', display: 'inline-block' }}>
-            Area: {selectedToko.folder}
+            Warna Pin: {selectedToko.warnaPin}
           </div>
         </div>
 
-        <button 
-          onClick={handleStartTransaction}
-          style={{ width: '100%', padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '12px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-        >
-          🛒 MULAI TRANSAKSI
-        </button>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <button 
+            onClick={() => handleNavigate(selectedToko.lokasi)}
+            style={{ flex: 1, padding: '12px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            🧭 Navigasi
+          </button>
+          <button 
+            onClick={handleStartTransaction}
+            style={{ flex: 1, padding: '12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            🛒 Transaksi
+          </button>
+        </div>
 
         <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}>📊 Riwayat Kunjungan</h3>
-        
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-          <div style={{ flex: 1, background: '#E8F5E9', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', color: '#2E7D32' }}>Total Cash</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2E7D32' }}>Rp {totalCash.toLocaleString('id-ID')}</div>
-          </div>
-          <div style={{ flex: 1, background: '#FFF3E0', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', color: '#E65100' }}>Total Credit</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#E65100' }}>Rp {totalCredit.toLocaleString('id-ID')}</div>
-          </div>
-        </div>
-
-        {selectedToko.kunjungan.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>Belum ada riwayat kunjungan.</p>
-        ) : (
-          <div>
-            {selectedToko.kunjungan.map((k, idx) => (
-              <div key={idx} style={{ background: '#f9f9f9', padding: '12px', borderRadius: '8px', marginBottom: '8px', borderLeft: `4px solid ${k.tipe === 'Cash' ? '#4CAF50' : '#FF9800'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
-                  <span>{k.tanggal}</span>
-                  <span style={{ color: k.tipe === 'Cash' ? '#4CAF50' : '#FF9800' }}>{k.tipe}</span>
-                </div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px' }}>Rp {k.nominal.toLocaleString('id-ID')}</div>
-                {k.catatan && <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', fontStyle: 'italic' }}>📝 {k.catatan}</div>}
-              </div>
-            ))}
-          </div>
-        )}
+        <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>Belum ada riwayat kunjungan.</p>
       </div>
     );
   }
 
-  // --- TAMPILAN DAFTAR TOKO ---
   return (
     <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: '20px', color: '#1976D2' }}>🏪 Daftar Kunjungan Toko</h2>
+      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>🏪 Daftar Kunjungan Toko</h2>
 
       <div style={{ marginBottom: '15px' }}>
         <input
@@ -124,12 +96,12 @@ export default function TokoScreen() {
       </div>
 
       <div style={{ marginBottom: '15px', padding: '12px', background: '#E3F2FD', borderRadius: '8px', fontSize: '13px', color: '#1565C0' }}>
-        💡 <strong>Info:</strong> Klik nama toko untuk melihat detail, riwayat Cash/Credit, dan mulai transaksi. Untuk tambah/hapus toko, gunakan menu <strong>Map Market</strong>.
+        💡 <strong>Info:</strong> Klik nama toko untuk melihat detail, navigasi ke lokasi, dan mulai transaksi. Untuk tambah/edit/hapus toko, gunakan menu <strong>Map Market</strong>.
       </div>
 
       {filteredToko.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-          <p style={{ fontSize: '48px', margin: 0 }}>🏪</p>
+          <p style={{ fontSize: '48px', margin: 0 }}></p>
           <p>Belum ada toko.</p>
           <p style={{ fontSize: '14px' }}>Buka menu "Map Market" untuk menambah toko pertama.</p>
         </div>
@@ -147,11 +119,10 @@ export default function TokoScreen() {
                 border: '1px solid #ddd',
                 borderLeft: `6px solid ${toko.warnaPin}`,
                 cursor: 'pointer',
-                transition: 'transform 0.1s',
               }}
             >
               <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>🆔 {toko.idToko} | 📍 {toko.alamat}</p>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}> {toko.idToko} |  {toko.alamat}</p>
               <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>📞 {toko.telepon}</p>
               <div style={{ marginTop: '8px', fontSize: '11px', color: '#1976D2', fontWeight: 'bold' }}>
                 Klik untuk lihat detail & transaksi ➡️
