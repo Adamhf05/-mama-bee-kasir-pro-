@@ -42,15 +42,12 @@ export default function RiwayatScreen() {
         KunjunganRepo.getAll(),
         TokoRepo.getAll()
       ]);
-      
       const tokoMap = new Map(toko.map(t => [t.idToko, t.nama]));
       const kunjunganWithNama = kunjungan.map(k => ({
         ...k,
         tokoNama: tokoMap.get(k.idToko) || k.idToko
       }));
-      
       kunjunganWithNama.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
-      
       setKunjunganList(kunjunganWithNama);
       setTokoList(toko);
     } catch (error) {
@@ -91,7 +88,7 @@ export default function RiwayatScreen() {
       const imageData = await generateReceiptImage(receiptRef.current);
       await shareReceiptViaWhatsApp(imageData, showDetail.tokoNama);
     } catch (error) {
-      alert('❌ Gagal membagikan struk');
+      alert('Gagal membagikan struk');
     }
   };
 
@@ -100,39 +97,36 @@ export default function RiwayatScreen() {
     try {
       const imageData = await generateReceiptImage(receiptRef.current);
       await downloadReceiptImage(imageData, showDetail.tokoNama);
-      alert('✅ Struk didownload!');
+      alert('Struk didownload!');
     } catch (error) {
-      alert('❌ Gagal mendownload struk');
+      alert('Gagal mendownload struk');
     }
   };
 
   const handlePrint = () => {
     if (!receiptRef.current) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('⚠️ Popup diblokir!');
-      return;
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Fitur print tidak tersedia di versi ini.\n\nSilakan gunakan:\n- Kirim via WhatsApp\n- Download sebagai Gambar\n\nUntuk print thermal, hubungkan printer Bluetooth/USB terlebih dahulu.');
+        return;
+      }
+      const content = receiptRef.current.innerHTML;
+      printWindow.document.write('<html><head><title>Print Struk</title><style>@page { size: 58mm auto; margin: 0; } body { width: 58mm; margin: 0; padding: 5mm; font-family: monospace; font-size: 10px; } * { box-sizing: border-box; } img { max-width: 100%; }</style></head><body>' + content + '</body></html>');
+      printWindow.document.close();
+      setTimeout(() => {
+        try {
+          if (printWindow && !printWindow.closed) {
+            printWindow.print();
+            setTimeout(() => { try { printWindow.close(); } catch(e) {} }, 1000);
+          }
+        } catch (e) {
+          alert('Gagal print. Pastikan printer thermal terhubung.');
+        }
+      }, 500);
+    } catch (error) {
+      alert('Fitur print tidak tersedia.\n\nGunakan WhatsApp atau Download sebagai alternatif.');
     }
-    const content = receiptRef.current.innerHTML;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Struk</title>
-          <style>
-            @page { size: 58mm auto; margin: 0; }
-            body { width: 58mm; margin: 0; padding: 5mm; font-family: monospace; font-size: 10px; }
-            * { box-sizing: border-box; }
-            img { max-width: 100%; }
-          </style>
-        </head>
-        <body>${content}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
-    };
   };
 
   const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID');
@@ -144,7 +138,7 @@ export default function RiwayatScreen() {
           onClick={() => setShowDetail(null)}
           style={{ marginBottom: '15px', background: 'none', border: 'none', color: '#1976D2', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}
         >
-          ️ Kembali ke Riwayat
+          Kembali ke Riwayat
         </button>
 
         <h2 style={{ color: '#1976D2', textAlign: 'center' }}>Detail Transaksi</h2>
@@ -155,13 +149,13 @@ export default function RiwayatScreen() {
 
         <div style={{ display: 'grid', gap: '10px', maxWidth: '400px', margin: '0 auto' }}>
           <button onClick={handleShareWhatsApp} style={{ padding: '15px', background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-            📱 Kirim via WhatsApp
+            Kirim via WhatsApp
           </button>
           <button onClick={handleDownload} style={{ padding: '15px', background: '#1976D2', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-            💾 Download sebagai Gambar
+            Download sebagai Gambar
           </button>
           <button onClick={handlePrint} style={{ padding: '15px', background: '#333', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-            🖨️ Print Thermal (58mm)
+            Print Thermal (58mm)
           </button>
         </div>
       </div>
@@ -170,7 +164,7 @@ export default function RiwayatScreen() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', paddingBottom: '100px' }}>
-      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>📊 Riwayat Transaksi</h2>
+      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>Riwayat Transaksi</h2>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
         <div style={{ background: '#E3F2FD', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
@@ -192,7 +186,7 @@ export default function RiwayatScreen() {
       </div>
 
       <div style={{ background: 'white', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #ddd' }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>🔍 Filter:</h3>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>Filter:</h3>
         
         <div style={{ marginBottom: '10px' }}>
           <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '5px' }}>Toko:</label>

@@ -10,17 +10,49 @@ import PelangganScreen from './screens/PelangganScreen';
 import MapMarketScreen from './screens/MapMarketScreen';
 import RiwayatScreen from './screens/RiwayatScreen';
 import LaporanScreen from './screens/LaporanScreen';
+import LicenseScreen from './screens/LicenseScreen';
+import { checkLicenseStatus } from './utils/licenseManager';
 
 function MainApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentMenu, setCurrentMenu] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [licenseValid, setLicenseValid] = useState(false);
+  const [licenseChecked, setLicenseChecked] = useState(false);
   const { bg, text } = useTheme();
 
   useEffect(() => {
     const saved = localStorage.getItem('isLoggedIn');
     if (saved === 'true') setIsLoggedIn(true);
+    
+    // Check license status
+    const licenseResult = checkLicenseStatus();
+    if (licenseResult.status === 'active' || licenseResult.status === 'trial') {
+      setLicenseValid(true);
+    }
+    setLicenseChecked(true);
   }, []);
+
+  const handleLicenseActivated = () => {
+    setLicenseValid(true);
+  };
+
+  // Jika belum cek lisensi, tampilkan loading
+  if (!licenseChecked) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '60px', marginBottom: '20px' }}>🐝</div>
+          <p style={{ color: '#666' }}>Memverifikasi lisensi...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Jika lisensi tidak valid, tampilkan LicenseScreen
+  if (!licenseValid) {
+    return <LicenseScreen onActivated={handleLicenseActivated} />;
+  }
 
   if (!isLoggedIn) {
     return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
