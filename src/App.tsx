@@ -10,6 +10,7 @@ import PelangganScreen from './screens/PelangganScreen';
 import MapMarketScreen from './screens/MapMarketScreen';
 import RiwayatScreen from './screens/RiwayatScreen';
 import LaporanScreen from './screens/LaporanScreen';
+import AdminScreen from './screens/AdminScreen';
 import LicenseScreen from './screens/LicenseScreen';
 import { checkLicenseStatus } from './utils/licenseManager';
 
@@ -25,7 +26,7 @@ function MainApp() {
     const saved = localStorage.getItem('isLoggedIn');
     if (saved === 'true') setIsLoggedIn(true);
     
-    // Check license status
+    // CHECK LICENSE STATUS
     const licenseResult = checkLicenseStatus();
     if (licenseResult.status === 'active' || licenseResult.status === 'trial') {
       setLicenseValid(true);
@@ -37,7 +38,7 @@ function MainApp() {
     setLicenseValid(true);
   };
 
-  // Jika belum cek lisensi, tampilkan loading
+  // Loading screen saat check license
   if (!licenseChecked) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
@@ -104,6 +105,7 @@ function MainApp() {
         {currentMenu === 'mapmarket' && <MapMarketScreen />}
         {currentMenu === 'riwayat' && <RiwayatScreen />}
         {currentMenu === 'laporan' && <LaporanScreen />}
+        {currentMenu === 'admin' && <AdminScreen />}
         {currentMenu === 'voice' && <div style={{ padding: '20px', color: text, textAlign: 'center' }}>🎙️ Voice AI (Coming Soon)</div>}
       </main>
     </div>
