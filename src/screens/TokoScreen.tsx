@@ -31,8 +31,8 @@ interface TokoData {
   telepon: string;
   lokasi: string;
   warnaPin: string;
-  folder: string;
-  kunjungan: Kunjungan[];
+  folder?: string;
+  kunjungan?: Kunjungan[];
 }
 
 export default function TokoScreen() {
@@ -43,23 +43,35 @@ export default function TokoScreen() {
   const [produkList, setProdukList] = useState<Produk[]>([]);
   const [cart, setCart] = useState<ItemTransaksi[]>([]);
   const [pembayaran, setPembayaran] = useState<'Cash' | 'Credit'>('Cash');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const savedList = localStorage.getItem('tokoMasterData');
       if (savedList) {
-        setTokoList(JSON.parse(savedList));
+        const parsed = JSON.parse(savedList);
+        if (Array.isArray(parsed)) {
+          setTokoList(parsed);
+        }
       }
       const savedProduk = localStorage.getItem('produkData');
       if (savedProduk) {
-        setProdukList(JSON.parse(savedProduk));
+        const parsed = JSON.parse(savedProduk);
+        if (Array.isArray(parsed)) {
+          setProdukList(parsed);
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
+      setError('Gagal memuat data');
     }
   }, []);
 
   const handleNavigate = (lokasi: string) => {
+    if (!lokasi) {
+      alert('⚠️ Toko ini belum punya koordinat lokasi!');
+      return;
+    }
     Browser.open({ url: `https://www.google.com/maps/dir/?api=1&destination=${lokasi}` });
   };
 
@@ -67,6 +79,7 @@ export default function TokoScreen() {
     setCart([]);
     setPembayaran('Cash');
     setShowKasir(true);
+    setError(null);
   };
 
   const addToCart = (produk: Produk) => {
@@ -112,21 +125,26 @@ export default function TokoScreen() {
       tanggal: new Date().toLocaleString('id-ID'),
       tipe: pembayaran,
       total: getTotal(),
-      items: cart
+      items: [...cart]
     };
 
-    const updatedTokoList = tokoList.map(t => 
-      t.idToko === selectedToko?.idToko 
-        ? { ...t, kunjungan: [...t.kunjungan, kunjungan] }
-        : t
-    );
+    const updatedTokoList = tokoList.map(t => {
+      if (t.idToko === selectedToko?.idToko) {
+        const kunjunganLama = t.kunjungan || [];
+        return { ...t, kunjungan: [...kunjunganLama, kunjungan] };
+      }
+      return t;
+    });
 
     setTokoList(updatedTokoList);
     localStorage.setItem('tokoMasterData', JSON.stringify(updatedTokoList));
-    setSelectedToko({ ...selectedToko!, kunjungan: [...selectedToko!.kunjungan, kunjungan] });
+    
+    const updatedSelected = updatedTokoList.find(t => t.idToko === selectedToko?.idToko) || null;
+    setSelectedToko(updatedSelected);
+    
     setShowKasir(false);
     setCart([]);
-    alert(`✅ Transaksi berhasil!\nTotal: Rp ${getTotal().toLocaleString('id-ID')}\nPembayaran: ${pembayaran}`);
+    alert(`✅ Transaksi berhasil!\n\nTotal: Rp ${getTotal().toLocaleString('id-ID')}\nPembayaran: ${pembayaran}\nItems: ${cart.length}`);
   };
 
   const filteredToko = tokoList.filter(t =>
@@ -137,7 +155,7 @@ export default function TokoScreen() {
   // Halaman Kasir
   if (showKasir && selectedToko) {
     return (
-      <div style={{ padding: '20px', paddingBottom: '100px' }}>
+      <div style={{ padding: '20px', paddingBottom: '100px', minHeight: '100vh', background: '#f5f5f5' }}>
         <button 
           onClick={() => setShowKasir(false)}
           style={{ marginBottom: '15px', background: 'none', border: 'none', color: '#1976D2', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -147,50 +165,60 @@ export default function TokoScreen() {
 
         <h2 style={{ color: '#1976D2', textAlign: 'center' }}>🛒 Kasir - {selectedToko.nama}</h2>
 
-        <div style={{ background: '#E3F2FD', padding: '12px', borderRadius: '8px', marginBottom: '15px' }}>
+        <div style={{ background: '#E3F2FD', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontSize: '13px' }}>
           <strong>ID:</strong> {selectedToko.idToko} | <strong>Alamat:</strong> {selectedToko.alamat}
         </div>
 
-        <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}>📦 Pilih Produk</h3>
+        <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}>📦 Pilih Produk ({produkList.length} tersedia)</h3>
         
         {produkList.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>Belum ada produk. Tambahkan produk di menu Manajemen Produk.</p>
+          <div style={{ textAlign: 'center', padding: '30px', background: 'white', borderRadius: '8px', color: '#999' }}>
+            <p style={{ fontSize: '48px', margin: 0 }}>📦</p>
+            <p>Belum ada produk.</p>
+            <p style={{ fontSize: '12px' }}>Tambahkan produk di menu Manajemen Produk.</p>
+          </div>
         ) : (
           <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
-            {produkList.map(produk => (
-              <div key={produk.id} style={{ background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong>{produk.nama}</strong>
-                  <div style={{ fontSize: '12px', color: '#666' }}>{produk.kategori} • Stok: {produk.stok} {produk.satuan}</div>
-                  <div style={{ fontSize: '14px', color: '#1976D2', fontWeight: 'bold' }}>Rp {produk.harga.toLocaleString('id-ID')}</div>
+            {produkList.map(produk => {
+              const inCart = cart.find(item => item.produk.id === produk.id);
+              return (
+                <div key={produk.id} style={{ background: 'white', padding: '12px', borderRadius: '8px', border: inCart ? '2px solid #4CAF50' : '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <strong>{produk.nama}</strong>
+                    <div style={{ fontSize: '12px', color: '#666' }}>{produk.kategori} • Stok: {produk.stok} {produk.satuan}</div>
+                    <div style={{ fontSize: '14px', color: '#1976D2', fontWeight: 'bold' }}>Rp {produk.harga.toLocaleString('id-ID')}</div>
+                    {inCart && <div style={{ fontSize: '11px', color: '#4CAF50', fontWeight: 'bold' }}>✓ Di keranjang: {inCart.jumlah}</div>}
+                  </div>
+                  <button 
+                    onClick={() => addToCart(produk)}
+                    style={{ padding: '8px 16px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    + Tambah
+                  </button>
                 </div>
-                <button 
-                  onClick={() => addToCart(produk)}
-                  style={{ padding: '8px 16px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  + Tambah
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}>🛍️ Keranjang ({cart.length} item)</h3>
         
         {cart.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>Keranjang kosong</p>
+          <div style={{ textAlign: 'center', padding: '20px', background: 'white', borderRadius: '8px', color: '#999' }}>
+            Keranjang kosong. Pilih produk di atas.
+          </div>
         ) : (
           <div style={{ marginBottom: '20px' }}>
             {cart.map(item => (
-              <div key={item.produk.id} style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '8px' }}>
+              <div key={item.produk.id} style={{ background: 'white', padding: '12px', borderRadius: '8px', marginBottom: '8px', border: '1px solid #ddd' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <strong>{item.produk.nama}</strong>
                     <div style={{ fontSize: '12px', color: '#666' }}>Rp {item.produk.harga.toLocaleString('id-ID')} × {item.jumlah}</div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button onClick={() => updateQuantity(item.produk.id, item.jumlah - 1)} style={{ width: '30px', height: '30px', background: '#f44336', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold' }}>-</button>
-                    <span style={{ fontWeight: 'bold' }}>{item.jumlah}</span>
+                    <span style={{ fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>{item.jumlah}</span>
                     <button onClick={() => updateQuantity(item.produk.id, item.jumlah + 1)} style={{ width: '30px', height: '30px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
                     <button onClick={() => removeFromCart(item.produk.id)} style={{ padding: '5px 10px', background: '#ff9800', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
                   </div>
@@ -209,7 +237,7 @@ export default function TokoScreen() {
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}> Metode Pembayaran:</label>
+          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>💳 Metode Pembayaran:</label>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               onClick={() => setPembayaran('Cash')}
@@ -239,8 +267,9 @@ export default function TokoScreen() {
 
   // Tampilan Detail Toko
   if (selectedToko) {
-    const totalCash = selectedToko.kunjungan.filter(k => k.tipe === 'Cash').reduce((sum, k) => sum + k.total, 0);
-    const totalCredit = selectedToko.kunjungan.filter(k => k.tipe === 'Credit').reduce((sum, k) => sum + k.total, 0);
+    const kunjunganList = selectedToko.kunjungan || [];
+    const totalCash = kunjunganList.filter(k => k.tipe === 'Cash').reduce((sum, k) => sum + k.total, 0);
+    const totalCredit = kunjunganList.filter(k => k.tipe === 'Credit').reduce((sum, k) => sum + k.total, 0);
 
     return (
       <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
@@ -294,11 +323,11 @@ export default function TokoScreen() {
           </div>
         </div>
 
-        {selectedToko.kunjungan.length === 0 ? (
+        {kunjunganList.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>Belum ada riwayat kunjungan.</p>
         ) : (
           <div>
-            {selectedToko.kunjungan.map((k, idx) => (
+            {kunjunganList.map((k, idx) => (
               <div key={idx} style={{ background: '#f9f9f9', padding: '12px', borderRadius: '8px', marginBottom: '8px', borderLeft: `4px solid ${k.tipe === 'Cash' ? '#4CAF50' : '#FF9800'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
                   <span>{k.tanggal}</span>
@@ -317,7 +346,7 @@ export default function TokoScreen() {
   // Tampilan Daftar Toko
   return (
     <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}> Daftar Kunjungan Toko</h2>
+      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>🏪 Daftar Kunjungan Toko</h2>
 
       <div style={{ marginBottom: '15px' }}>
         <input
@@ -330,8 +359,14 @@ export default function TokoScreen() {
       </div>
 
       <div style={{ marginBottom: '15px', padding: '12px', background: '#E3F2FD', borderRadius: '8px', fontSize: '13px', color: '#1565C0' }}>
-         <strong>Info:</strong> Klik nama toko untuk melihat detail, navigasi ke lokasi, dan mulai transaksi. Untuk tambah/edit/hapus toko, gunakan menu <strong>Map Market</strong>.
+        💡 <strong>Info:</strong> Klik nama toko untuk melihat detail, navigasi, dan transaksi. Untuk tambah/edit/hapus toko, gunakan menu <strong>Map Market</strong>.
       </div>
+
+      {error && (
+        <div style={{ background: '#ffebee', padding: '10px', borderRadius: '8px', marginBottom: '15px', color: '#c62828' }}>
+          {error}
+        </div>
+      )}
 
       {filteredToko.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
@@ -356,8 +391,8 @@ export default function TokoScreen() {
               }}
             >
               <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>🆔 {toko.idToko} | 📍 {toko.alamat}</p>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}> {toko.telepon}</p>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}> {toko.idToko} | 📍 {toko.alamat}</p>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>📞 {toko.telepon}</p>
               <div style={{ marginTop: '8px', fontSize: '11px', color: '#1976D2', fontWeight: 'bold' }}>
                 Klik untuk lihat detail & transaksi ➡️
               </div>
