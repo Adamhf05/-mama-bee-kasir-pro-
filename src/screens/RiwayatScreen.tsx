@@ -97,36 +97,13 @@ export default function RiwayatScreen() {
     try {
       const imageData = await generateReceiptImage(receiptRef.current);
       await downloadReceiptImage(imageData, showDetail.tokoNama);
-      alert('Struk didownload!');
     } catch (error) {
       alert('Gagal mendownload struk');
     }
   };
 
   const handlePrint = () => {
-    if (!receiptRef.current) return;
-    try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Fitur print tidak tersedia di versi ini.\n\nSilakan gunakan:\n- Kirim via WhatsApp\n- Download sebagai Gambar\n\nUntuk print thermal, hubungkan printer Bluetooth/USB terlebih dahulu.');
-        return;
-      }
-      const content = receiptRef.current.innerHTML;
-      printWindow.document.write('<html><head><title>Print Struk</title><style>@page { size: 58mm auto; margin: 0; } body { width: 58mm; margin: 0; padding: 5mm; font-family: monospace; font-size: 10px; } * { box-sizing: border-box; } img { max-width: 100%; }</style></head><body>' + content + '</body></html>');
-      printWindow.document.close();
-      setTimeout(() => {
-        try {
-          if (printWindow && !printWindow.closed) {
-            printWindow.print();
-            setTimeout(() => { try { printWindow.close(); } catch(e) {} }, 1000);
-          }
-        } catch (e) {
-          alert('Gagal print. Pastikan printer thermal terhubung.');
-        }
-      }, 500);
-    } catch (error) {
-      alert('Fitur print tidak tersedia.\n\nGunakan WhatsApp atau Download sebagai alternatif.');
-    }
+    alert('🖨️ Fitur Print Thermal belum tersedia di versi ini.\n\nSilakan gunakan:\n• Kirim via WhatsApp (share ke printer)\n• Download sebagai Gambar\n\nUntuk print thermal langsung, fitur ini akan tersedia di update berikutnya dengan dukungan printer Bluetooth/USB.');
   };
 
   const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID');
