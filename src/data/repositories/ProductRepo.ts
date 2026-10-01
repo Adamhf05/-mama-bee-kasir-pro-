@@ -39,7 +39,16 @@ export const ProductRepo = {
     await db.products.delete(id);
   },
 
-  updateStock: async (id: number, qty: number): Promise<void> => {
+  //  FIX: Langsung set stock ke nilai yang diberikan (bukan di-add)
+  setStock: async (id: number, newStock: number): Promise<void> => {
+    await db.products.update(id, {
+      stock: newStock,
+      updatedAt: new Date()
+    });
+  },
+
+  // Untuk kasus lain yang memang perlu add (misal: restock)
+  addStock: async (id: number, qty: number): Promise<void> => {
     const product = await db.products.get(id);
     if (product) {
       await db.products.update(id, {
@@ -47,5 +56,13 @@ export const ProductRepo = {
         updatedAt: new Date()
       });
     }
+  },
+
+  // Backward compatibility - sekarang langsung set, bukan add
+  updateStock: async (id: number, newStock: number): Promise<void> => {
+    await db.products.update(id, {
+      stock: newStock,
+      updatedAt: new Date()
+    });
   }
 };

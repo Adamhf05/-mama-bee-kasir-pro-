@@ -52,17 +52,63 @@ export interface Store {
   logo?: string;
 }
 
+//  BARU: Toko Customer (yang dikunjungi sales)
+export interface SalesToko {
+  idToko: string;        // Primary key (manual dari user)
+  nama: string;
+  alamat: string;
+  telepon: string;
+  lokasi: string;        // koordinat "lat,lng"
+  warnaPin: string;
+  folder: string;        // area/wilayah
+  hariKunjungan: string[]; // ['Senin', 'Kamis']
+  catatan?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+//  BARU: Riwayat Kunjungan
+export interface KunjunganRecord {
+  id?: number;           // Auto-increment
+  idToko: string;        // Foreign key ke SalesToko
+  tanggal: string;       // "1/10/2026, 19.59.17"
+  tipe: 'Cash' | 'Credit';
+  total: number;
+  items: {
+    produkId: number;
+    namaProduk: string;
+    hargaSatuan: number;
+    jumlah: number;
+    subtotal: number;
+  }[];
+  createdAt: Date;
+}
+
 export class MamaBeeDatabase extends Dexie {
   products!: Table<Product>;
   transactions!: Table<Transaction>;
   stores!: Table<Store>;
+  salesToko!: Table<SalesToko>;
+  kunjungan!: Table<KunjunganRecord>;
 
   constructor() {
     super('mamabee-kasir-pro');
+    
     this.version(1).stores({
       products: '++id, name, category, price, stock',
       transactions: '++id, invoice, total, createdAt',
       stores: '++id, name'
+    });
+    
+    //  Upgrade ke version 2: tambah tabel SalesToko & Kunjungan
+    this.version(2).stores({
+      products: '++id, name, category, price, stock',
+      transactions: '++id, invoice, total, createdAt',
+      stores: '++id, name',
+      salesToko: 'idToko, nama, folder',
+      kunjungan: '++id, idToko, tanggal, tipe'
+    }).upgrade(() => {
+      console.log(' Database upgraded to version 2');
     });
   }
 }
