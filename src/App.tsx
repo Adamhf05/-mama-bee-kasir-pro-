@@ -5,8 +5,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { ProdukScreen } from './screens/ProdukScreen';
 import { KasirScreen } from './screens/KasirScreen';
-import { TokoScreen } from './screens/TokoScreen';
-import { PelangganScreen } from './screens/PelangganScreen';
+import TokoScreen from './screens/TokoScreen';
+import PelangganScreen from './screens/PelangganScreen';
 
 function MainApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
