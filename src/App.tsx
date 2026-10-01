@@ -5,8 +5,9 @@ import { LoginScreen } from './screens/LoginScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { ProdukScreen } from './screens/ProdukScreen';
 import { KasirScreen } from './screens/KasirScreen';
-import TokoScreen from './screens/TokoScreen';
-import PelangganScreen from './screens/PelangganScreen';
+import { TokoScreen } from './screens/TokoScreen';
+import { PelangganScreen } from './screens/PelangganScreen';
+import { MapMarketScreen } from './screens/MapMarketScreen';
 
 function MainApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -66,6 +67,7 @@ function MainApp() {
         {currentMenu === 'produk' && <ProdukScreen />}
         {currentMenu === 'toko' && <TokoScreen />}
         {currentMenu === 'pelanggan' && <PelangganScreen />}
+        {currentMenu === 'mapmarket' && <MapMarketScreen />}
         {currentMenu === 'riwayat' && <div style={{ padding: '20px', color: text }}>Halaman Riwayat (Coming Soon)</div>}
         {currentMenu === 'laporan' && <div style={{ padding: '20px', color: text }}>Halaman Laporan (Coming Soon)</div>}
         {currentMenu === 'voice' && <div style={{ padding: '20px', color: text }}>Voice AI (Coming Soon)</div>}
