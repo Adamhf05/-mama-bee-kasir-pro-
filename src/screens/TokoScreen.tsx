@@ -1,46 +1,27 @@
 import { useState, useEffect } from 'react';
 
+interface Kunjungan {
+  tanggal: string;
+  tipe: 'Cash' | 'Credit';
+  nominal: number;
+  catatan: string;
+}
+
 interface TokoData {
   idToko: string;
   nama: string;
   alamat: string;
   telepon: string;
-  logo: string;
   lokasi: string;
-  deskripsi: string;
   folder: string;
   warnaPin: string;
+  kunjungan: Kunjungan[];
 }
-
-const WARNA_PIN = [
-  { value: '#2196F3', label: 'Biru' },
-  { value: '#4CAF50', label: 'Hijau' },
-  { value: '#F44336', label: 'Merah' },
-  { value: '#E91E63', label: 'Pink' },
-  { value: '#9C27B0', label: 'Ungu' },
-  { value: '#FF9800', label: 'Orange' },
-  { value: '#795548', label: 'Coklat' },
-  { value: '#607D8B', label: 'Abu-abu' },
-];
 
 export default function TokoScreen() {
   const [tokoList, setTokoList] = useState<TokoData[]>([]);
-  const [currentToko, setCurrentToko] = useState<TokoData>({
-    idToko: '',
-    nama: '',
-    alamat: '',
-    telepon: '',
-    logo: '',
-    lokasi: '',
-    deskripsi: '',
-    folder: 'Default',
-    warnaPin: '#2196F3'
-  });
-  const [editId, setEditId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [folders, setFolders] = useState<string[]>(['Default']);
-  const [newFolder, setNewFolder] = useState('');
-  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [selectedToko, setSelectedToko] = useState<TokoData | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     try {
@@ -48,558 +29,132 @@ export default function TokoScreen() {
       if (savedList) {
         setTokoList(JSON.parse(savedList));
       }
-
-      const savedFolders = localStorage.getItem('tokoFolders');
-      if (savedFolders) {
-        setFolders(JSON.parse(savedFolders));
-      }
-
-      generateNewId();
     } catch (error) {
       console.error('Error loading data:', error);
     }
   }, []);
 
-  const generateNewId = () => {
-    const newId = 'TOKO-' + String(tokoList.length + 1).padStart(4, '0');
-    setCurrentToko(prev => ({ ...prev, idToko: newId }));
+  const handleStartTransaction = () => {
+    alert('🚀 Fitur Transaksi (Kasir & Produk) akan segera terhubung di sini!\n\nNanti sales bisa pilih barang, hitung total, dan pilih Cash/Credit.');
+    // Nanti di Milestone 4, ini akan redirect ke halaman Kasir dengan ID toko ini
   };
 
-  const handleSave = () => {
-    try {
-      if (!currentToko.nama) {
-        alert('⚠️ Nama toko harus diisi!');
-        return;
-      }
+  const filteredToko = tokoList.filter(t =>
+    t.idToko.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-      let updatedList;
-      if (editId) {
-        // Update toko yang sudah ada
-        updatedList = tokoList.map(t => 
-          t.idToko === editId ? currentToko : t
-        );
-        alert('✅ Data toko berhasil diupdate!');
-      } else {
-        // Tambah toko baru
-        updatedList = [...tokoList, currentToko];
-        alert('✅ Data toko berhasil disimpan!');
-      }
+  // --- TAMPILAN DETAIL TOKO ---
+  if (selectedToko) {
+    const totalCash = selectedToko.kunjungan.filter(k => k.tipe === 'Cash').reduce((sum, k) => sum + k.nominal, 0);
+    const totalCredit = selectedToko.kunjungan.filter(k => k.tipe === 'Credit').reduce((sum, k) => sum + k.nominal, 0);
 
-      setTokoList(updatedList);
-      localStorage.setItem('tokoMasterData', JSON.stringify(updatedList));
-      
-      // Reset form
-      setEditId(null);
-      setShowForm(false);
-      setCurrentToko({
-        idToko: '',
-        nama: '',
-        alamat: '',
-        telepon: '',
-        logo: '',
-        lokasi: '',
-        deskripsi: '',
-        folder: 'Default',
-        warnaPin: '#2196F3'
-      });
-      
-      // Generate ID baru untuk toko berikutnya
-      setTimeout(() => generateNewId(), 100);
-    } catch (error) {
-      console.error('Error saving data:', error);
-      alert('❌ Gagal menyimpan data: ' + (error as Error).message);
-    }
-  };
+    return (
+      <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+        <button 
+          onClick={() => setSelectedToko(null)}
+          style={{ marginBottom: '15px', background: 'none', border: 'none', color: '#1976D2', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          ⬅️ Kembali ke Daftar Toko
+        </button>
 
-  const handleEdit = (toko: TokoData) => {
-    setCurrentToko(toko);
-    setEditId(toko.idToko);
-    setShowForm(true);
-  };
-
-  const handleDelete = (idToko: string) => {
-    if (confirm('Yakin ingin menghapus toko ini?')) {
-      const updatedList = tokoList.filter(t => t.idToko !== idToko);
-      setTokoList(updatedList);
-      localStorage.setItem('tokoMasterData', JSON.stringify(updatedList));
-      alert('️ Toko berhasil dihapus!');
-    }
-  };
-
-  const handleCancel = () => {
-    setEditId(null);
-    setShowForm(false);
-    setCurrentToko({
-      idToko: '',
-      nama: '',
-      alamat: '',
-      telepon: '',
-      logo: '',
-      lokasi: '',
-      deskripsi: '',
-      folder: 'Default',
-      warnaPin: '#2196F3'
-    });
-    generateNewId();
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCurrentToko({ ...currentToko, logo: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLokasi = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lokasi = `${position.coords.latitude},${position.coords.longitude}`;
-          setCurrentToko({ ...currentToko, lokasi });
-          alert('✅ Lokasi berhasil diambil: ' + lokasi);
-        },
-        (error) => {
-          alert('❌ Gagal mendapatkan lokasi: ' + error.message);
-        }
-      );
-    } else {
-      alert(' Browser tidak mendukung geolocation');
-    }
-  };
-
-  const handleAddFolder = () => {
-    if (newFolder && !folders.includes(newFolder)) {
-      const updatedFolders = [...folders, newFolder];
-      setFolders(updatedFolders);
-      localStorage.setItem('tokoFolders', JSON.stringify(updatedFolders));
-      setCurrentToko({ ...currentToko, folder: newFolder });
-      setNewFolder('');
-      setShowNewFolder(false);
-    }
-  };
-
-  return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', paddingBottom: '100px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, color: '#1976D2' }}> Master Data Toko</h2>
-        {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            style={{
-              padding: '10px 20px',
-              background: '#1976D2',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            + Tambah Toko
-          </button>
-        )}
-      </div>
-
-      {showForm && (
-        <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-          <h3 style={{ marginTop: 0 }}>{editId ? 'Edit Toko' : 'Tambah Toko Baru'}</h3>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              ID Toko (Unik)
-            </label>
-            <input
-              type="text"
-              value={currentToko.idToko}
-              onChange={(e) => setCurrentToko({ ...currentToko, idToko: e.target.value })}
-              placeholder="TOKO-XXXX"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '2px solid #1976D2',
-                borderRadius: '8px',
-                fontSize: '14px',
-                background: '#E3F2FD',
-                fontWeight: 'bold',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Nama Toko
-            </label>
-            <input
-              type="text"
-              value={currentToko.nama}
-              onChange={(e) => setCurrentToko({ ...currentToko, nama: e.target.value })}
-              placeholder="Masukkan nama toko"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Alamat Toko
-            </label>
-            <textarea
-              value={currentToko.alamat}
-              onChange={(e) => setCurrentToko({ ...currentToko, alamat: e.target.value })}
-              placeholder="Masukkan alamat lengkap"
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                resize: 'vertical',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Nomor Telepon
-            </label>
-            <input
-              type="tel"
-              value={currentToko.telepon}
-              onChange={(e) => setCurrentToko({ ...currentToko, telepon: e.target.value })}
-              placeholder="08xxxxxxxxxx"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Deskripsi/Catatan
-            </label>
-            <textarea
-              value={currentToko.deskripsi}
-              onChange={(e) => setCurrentToko({ ...currentToko, deskripsi: e.target.value })}
-              placeholder="Catatan tambahan tentang toko ini"
-              rows={2}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                resize: 'vertical',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Folder/Kategori
-            </label>
-            {!showNewFolder ? (
-              <select
-                value={currentToko.folder}
-                onChange={(e) => {
-                  if (e.target.value === '__new__') {
-                    setShowNewFolder(true);
-                  } else {
-                    setCurrentToko({ ...currentToko, folder: e.target.value });
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  background: 'white',
-                  boxSizing: 'border-box'
-                }}
-              >
-                {folders.map(f => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-                <option value="__new__">+ Buat Folder Baru</option>
-              </select>
-            ) : (
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <input
-                  type="text"
-                  value={newFolder}
-                  onChange={(e) => setNewFolder(e.target.value)}
-                  placeholder="Nama folder baru"
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    fontSize: '14px'
-                  }}
-                />
-                <button
-                  onClick={handleAddFolder}
-                  style={{
-                    padding: '10px 20px',
-                    background: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  OK
-                </button>
-                <button
-                  onClick={() => setShowNewFolder(false)}
-                  style={{
-                    padding: '10px 20px',
-                    background: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Batal
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Warna Pin di Peta
-            </label>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {WARNA_PIN.map(w => (
-                <button
-                  key={w.value}
-                  onClick={() => setCurrentToko({ ...currentToko, warnaPin: w.value })}
-                  style={{
-                    width: '50px',
-                    height: '50px',
-                    background: w.value,
-                    border: currentToko.warnaPin === w.value ? '3px solid #000' : '2px solid #ddd',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transform: currentToko.warnaPin === w.value ? 'scale(1.1)' : 'scale(1)'
-                  }}
-                  title={w.label}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Logo Toko
-            </label>
-            {currentToko.logo && (
-              <img
-                src={currentToko.logo}
-                alt="Logo Toko"
-                style={{
-                  width: '100px',
-                  height: '100px',
-                  objectFit: 'cover',
-                  borderRadius: '8px',
-                  marginBottom: '10px'
-                }}
-              />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '8px'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Lokasi Toko (Koordinat)
-            </label>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input
-                type="text"
-                value={currentToko.lokasi}
-                onChange={(e) => setCurrentToko({ ...currentToko, lokasi: e.target.value })}
-                placeholder="Latitude,Longitude"
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }}
-              />
-              <button
-                onClick={handleLokasi}
-                style={{
-                  padding: '10px 20px',
-                  background: '#1976D2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                📍 Ambil Lokasi
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              onClick={handleSave}
-              style={{
-                flex: 1,
-                padding: '12px',
-                background: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              💾 Simpan
-            </button>
-            <button
-              onClick={handleCancel}
-              style={{
-                flex: 1,
-                padding: '12px',
-                background: '#f44336',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              Batal
-            </button>
+        <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #ddd', marginBottom: '20px' }}>
+          <h2 style={{ margin: '0 0 10px 0', color: '#1976D2' }}>{selectedToko.nama}</h2>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}><strong>ID:</strong> {selectedToko.idToko}</p>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>📍 {selectedToko.alamat}</p>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>📞 {selectedToko.telepon}</p>
+          <div style={{ marginTop: '10px', padding: '6px 12px', background: selectedToko.warnaPin, color: 'white', borderRadius: '6px', fontSize: '12px', display: 'inline-block' }}>
+            Area: {selectedToko.folder}
           </div>
         </div>
-      )}
 
-      {/* Daftar Toko Tersimpan */}
-      <h3 style={{ color: '#1976D2', marginBottom: '15px' }}>
-         Daftar Toko ({tokoList.length})
-      </h3>
-      
-      {tokoList.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '40px',
-          color: '#999'
-        }}>
+        <button 
+          onClick={handleStartTransaction}
+          style={{ width: '100%', padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '12px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+        >
+          🛒 MULAI TRANSAKSI
+        </button>
+
+        <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}>📊 Riwayat Kunjungan</h3>
+        
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+          <div style={{ flex: 1, background: '#E8F5E9', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '12px', color: '#2E7D32' }}>Total Cash</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2E7D32' }}>Rp {totalCash.toLocaleString('id-ID')}</div>
+          </div>
+          <div style={{ flex: 1, background: '#FFF3E0', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '12px', color: '#E65100' }}>Total Credit</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#E65100' }}>Rp {totalCredit.toLocaleString('id-ID')}</div>
+          </div>
+        </div>
+
+        {selectedToko.kunjungan.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>Belum ada riwayat kunjungan.</p>
+        ) : (
+          <div>
+            {selectedToko.kunjungan.map((k, idx) => (
+              <div key={idx} style={{ background: '#f9f9f9', padding: '12px', borderRadius: '8px', marginBottom: '8px', borderLeft: `4px solid ${k.tipe === 'Cash' ? '#4CAF50' : '#FF9800'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                  <span>{k.tanggal}</span>
+                  <span style={{ color: k.tipe === 'Cash' ? '#4CAF50' : '#FF9800' }}>{k.tipe}</span>
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px' }}>Rp {k.nominal.toLocaleString('id-ID')}</div>
+                {k.catatan && <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', fontStyle: 'italic' }}>📝 {k.catatan}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- TAMPILAN DAFTAR TOKO ---
+  return (
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+      <h2 style={{ marginBottom: '20px', color: '#1976D2' }}>🏪 Daftar Kunjungan Toko</h2>
+
+      <div style={{ marginBottom: '15px' }}>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Cari ID atau Nama Toko..."
+          style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '15px', padding: '12px', background: '#E3F2FD', borderRadius: '8px', fontSize: '13px', color: '#1565C0' }}>
+        💡 <strong>Info:</strong> Klik nama toko untuk melihat detail, riwayat Cash/Credit, dan mulai transaksi. Untuk tambah/hapus toko, gunakan menu <strong>Map Market</strong>.
+      </div>
+
+      {filteredToko.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
           <p style={{ fontSize: '48px', margin: 0 }}>🏪</p>
-          <p>Belum ada toko tersimpan</p>
-          <p style={{ fontSize: '14px' }}>Klik "+ Tambah Toko" untuk menambah toko pertama</p>
+          <p>Belum ada toko.</p>
+          <p style={{ fontSize: '14px' }}>Buka menu "Map Market" untuk menambah toko pertama.</p>
         </div>
       ) : (
         <div>
-          {tokoList.map(toko => (
+          {filteredToko.map(toko => (
             <div
               key={toko.idToko}
+              onClick={() => setSelectedToko(toko)}
               style={{
                 background: 'white',
                 padding: '15px',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 marginBottom: '10px',
                 border: '1px solid #ddd',
-                borderLeft: `5px solid ${toko.warnaPin}`
+                borderLeft: `6px solid ${toko.warnaPin}`,
+                cursor: 'pointer',
+                transition: 'transform 0.1s',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-                  <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>
-                    <strong>ID:</strong> {toko.idToko}
-                  </p>
-                  <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>
-                    📍 {toko.alamat}
-                  </p>
-                  <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>
-                    📞 {toko.telepon}
-                  </p>
-                  {toko.deskripsi && (
-                    <p style={{ margin: '3px 0', fontSize: '12px', color: '#999', fontStyle: 'italic' }}>
-                      📝 {toko.deskripsi}
-                    </p>
-                  )}
-                  <div style={{ 
-                    marginTop: '8px', 
-                    padding: '4px 8px', 
-                    background: toko.warnaPin, 
-                    color: 'white', 
-                    borderRadius: '4px', 
-                    fontSize: '11px',
-                    display: 'inline-block'
-                  }}>
-                    Folder: {toko.folder}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <button
-                    onClick={() => handleEdit(toko)}
-                    style={{
-                      padding: '5px 10px',
-                      background: '#FFC107',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => handleDelete(toko.idToko)}
-                    style={{
-                      padding: '5px 10px',
-                      background: '#f44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    🗑️
-                  </button>
-                </div>
+              <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>🆔 {toko.idToko} | 📍 {toko.alamat}</p>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>📞 {toko.telepon}</p>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: '#1976D2', fontWeight: 'bold' }}>
+                Klik untuk lihat detail & transaksi ➡️
               </div>
             </div>
           ))}
