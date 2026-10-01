@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Browser } from '@capacitor/browser';
+import { Geolocation } from '@capacitor/geolocation';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface TokoData {
   idToko: string;
@@ -20,6 +24,16 @@ const WARNA_PIN = [
   { value: '#E91E63', label: 'Pink' },
 ];
 
+function createCustomIcon(color: string) {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+}
+
 export default function MapMarketScreen() {
   const [tokoList, setTokoList] = useState<TokoData[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -32,6 +46,7 @@ export default function MapMarketScreen() {
     lokasi: '',
     warnaPin: '#2196F3'
   });
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-2.5489, 118.0149]);
 
   useEffect(() => {
     try {
@@ -104,15 +119,31 @@ export default function MapMarketScreen() {
     }
   };
 
+  const handleGetCurrentLocation = async () => {
+    try {
+      alert('📍 Mengambil lokasi saat ini...');
+      const coordinates = await Geolocation.getCurrentPosition();
+      const lat = coordinates.coords.latitude;
+      const lng = coordinates.coords.longitude;
+      const lokasiStr = `${lat}, ${lng}`;
+      setCurrentToko({...currentToko, lokasi: lokasiStr});
+      setMapCenter([lat, lng]);
+      alert(`✅ Lokasi didapat: ${lokasiStr}`);
+    } catch (error) {
+      alert('❌ Gagal mendapatkan lokasi. Pastikan GPS aktif dan izin lokasi diberikan.');
+    }
+  };
+
   const handleOpenGoogleMaps = () => {
     Browser.open({ url: 'https://www.google.com/maps' });
-    alert('📍 Cara dapat koordinat:\n1. Buka Google Maps\n2. Tekan lama di lokasi toko\n3. Copy koordinat yang muncul\n4. Paste di field "Koordinat" di form ini');
+    alert(' Cara dapat koordinat:\n1. Buka Google Maps\n2. Tekan lama di lokasi toko\n3. Copy koordinat yang muncul\n4. Paste di field "Koordinat" di form ini');
   };
 
   const handleNavigate = (lokasi: string) => {
     Browser.open({ url: `https://www.google.com/maps/dir/?api=1&destination=${lokasi}` });
   };
 
+  // Form Tambah/Edit Toko
   if (showForm) {
     return (
       <div style={{ padding: '20px', paddingBottom: '100px' }}>
@@ -122,10 +153,8 @@ export default function MapMarketScreen() {
 
         <div style={{ background: '#E3F2FD', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontSize: '13px', color: '#1565C0' }}>
           💡 <strong>Cara Input Lokasi:</strong><br/>
-          1. Klik tombol "📍 Buka Google Maps" di bawah<br/>
-          2. Cari/tekan lama lokasi toko di Google Maps<br/>
-          3. Copy koordinat yang muncul<br/>
-          4. Paste di field "Koordinat" di form ini
+          • Klik "📍 Ambil Lokasi Saat Ini" untuk GPS otomatis<br/>
+          • Atau buka Google Maps → tekan lama lokasi → copy koordinat
         </div>
         
         <div style={{ marginBottom: '15px' }}>
@@ -182,13 +211,21 @@ export default function MapMarketScreen() {
             placeholder="-3.3198, 114.5908"
             style={{ width: '100%', padding: '10px', border: '2px solid #FF9800', borderRadius: '8px', boxSizing: 'border-box' }}
           />
-          <button
-            onClick={handleOpenGoogleMaps}
-            style={{ width: '100%', padding: '10px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '8px', marginTop: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-             Buka Google Maps untuk Ambil Koordinat
-          </button>
-          <small style={{color:'#666', display: 'block', marginTop: '5px'}}>Wajib diisi! Copy dari Google Maps</small>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <button
+              onClick={handleGetCurrentLocation}
+              style={{ flex: 1, padding: '10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+            >
+              📍 Ambil Lokasi Saat Ini (GPS)
+            </button>
+            <button
+              onClick={handleOpenGoogleMaps}
+              style={{ flex: 1, padding: '10px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+            >
+              🗺️ Buka Google Maps
+            </button>
+          </div>
+          <small style={{color:'#666', display: 'block', marginTop: '5px'}}>Wajib diisi! Gunakan GPS atau copy dari Google Maps</small>
         </div>
 
         <div style={{ marginBottom: '15px' }}>
@@ -234,91 +271,70 @@ export default function MapMarketScreen() {
     );
   }
 
+  // Tampilan Utama: Peta + Daftar Toko
   return (
-    <div style={{ padding: '20px', paddingBottom: '100px' }}>
-      <h2 style={{ color: '#1976D2', textAlign: 'center' }}>🗺️ Map Market</h2>
-      
-      <div style={{ background: '#E3F2FD', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontSize: '13px', color: '#1565C0' }}>
-        💡 <strong>Fungsi Map Market:</strong><br/>
-        • Tambah toko baru dengan lokasi dari Google Maps<br/>
-        • Edit/hapus data toko<br/>
-        • Navigasi langsung ke lokasi toko via Google Maps<br/>
-        • Data otomatis tersimpan di Menu Toko
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '10px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+        <h2 style={{ color: '#1976D2', textAlign: 'center', margin: '0 0 10px 0' }}>️ Map Market</h2>
+        <button 
+          onClick={() => {
+            setCurrentToko({
+              idToko: '',
+              nama: '',
+              alamat: '',
+              telepon: '',
+              lokasi: '',
+              warnaPin: '#2196F3'
+            });
+            setEditId(null);
+            setShowForm(true);
+          }}
+          style={{ width: '100%', padding: '10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold' }}
+        >
+           Tambah Toko Baru
+        </button>
       </div>
 
-      <button 
-        onClick={() => {
-          setCurrentToko({
-            idToko: '',
-            nama: '',
-            alamat: '',
-            telepon: '',
-            lokasi: '',
-            warnaPin: '#2196F3'
-          });
-          setEditId(null);
-          setShowForm(true);
-        }}
-        style={{ width: '100%', padding: '12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', marginBottom: '15px', fontSize: '16px', fontWeight: 'bold' }}
-      >
-         Tambah Toko Baru
-      </button>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <MapContainer center={mapCenter} zoom={15} style={{ height: '100%', width: '100%' }}>
+          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          {tokoList.map((toko, idx) => {
+            if (!toko.lokasi) return null;
+            const [lat, lng] = toko.lokasi.split(',').map(Number);
+            return (
+              <Marker key={idx} position={[lat, lng]} icon={createCustomIcon(toko.warnaPin)}>
+                <Popup>
+                  <div style={{ minWidth: '180px' }}>
+                    <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
+                    <p style={{ margin: '3px 0', fontSize: '12px' }}><strong>ID:</strong> {toko.idToko}</p>
+                    <p style={{ margin: '3px 0', fontSize: '12px' }}>📍 {toko.alamat}</p>
+                    <p style={{ margin: '3px 0', fontSize: '12px' }}>📞 {toko.telepon}</p>
+                    <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                      <button onClick={() => handleNavigate(toko.lokasi)} style={{ flex: 1, padding: '6px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}> Navigasi</button>
+                      <button onClick={() => { setCurrentToko(toko); setEditId(toko.idToko); setShowForm(true); }} style={{ flex: 1, padding: '6px', background: '#FFC107', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✏️ Edit</button>
+                      <button onClick={() => handleDelete(toko.idToko)} style={{ padding: '6px', background: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>🗑️</button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MapContainer>
+      </div>
 
-      {tokoList.length > 0 && (
-        <div style={{ marginBottom: '15px', padding: '10px', background: '#FFF3E0', borderRadius: '8px', fontSize: '13px' }}>
+      <div style={{ padding: '10px', background: 'white', boxShadow: '0 -2px 4px rgba(0,0,0,0.1)' }}>
+        <div style={{ textAlign: 'center', fontSize: '13px', color: '#666', marginBottom: '5px' }}>
           📊 Total: <strong>{tokoList.length}</strong> toko tersimpan
         </div>
-      )}
-
-      {tokoList.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-          <p style={{ fontSize: '48px', margin: 0 }}>🗺️</p>
-          <p>Belum ada toko</p>
-          <p style={{ fontSize: '14px' }}>Klik "Tambah Toko Baru" untuk mulai</p>
-        </div>
-      ) : (
-        <div>
-          {tokoList.map(toko => (
-            <div key={toko.idToko} style={{ background: 'white', padding: '15px', borderRadius: '8px', marginBottom: '10px', border: '1px solid #ddd', borderLeft: `6px solid ${toko.warnaPin}` }}>
-              <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}><strong>ID:</strong> {toko.idToko}</p>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>📍 {toko.alamat}</p>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>📞 {toko.telepon}</p>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>🗺️ Koordinat: {toko.lokasi}</p>
-              
-              <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-                <button 
-                  onClick={() => handleNavigate(toko.lokasi)}
-                  style={{ flex: 2, padding: '8px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                >
-                  🧭 Navigasi Google Maps
-                </button>
-                <button 
-                  onClick={() => { setCurrentToko(toko); setEditId(toko.idToko); setShowForm(true); }}
-                  style={{ flex: 1, padding: '8px', background: '#FFC107', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  ✏️ Edit
-                </button>
-                <button 
-                  onClick={() => handleDelete(toko.idToko)}
-                  style={{ flex: 1, padding: '8px', background: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tokoList.length > 0 && (
-        <button 
-          onClick={handleClearAll}
-          style={{ width: '100%', padding: '10px', background: '#ff9800', color: 'white', border: 'none', borderRadius: '8px', marginTop: '20px', fontSize: '12px' }}
-        >
-          🗑️ Hapus Semua Data
-        </button>
-      )}
+        {tokoList.length > 0 && (
+          <button 
+            onClick={handleClearAll}
+            style={{ width: '100%', padding: '8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px' }}
+          >
+            🗑️ Hapus Semua Data
+          </button>
+        )}
+      </div>
     </div>
   );
 }

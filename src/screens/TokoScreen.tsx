@@ -104,7 +104,7 @@ export default function TokoScreen() {
 
   const handleCheckout = () => {
     if (cart.length === 0) {
-      alert('⚠️ Keranjang kosong!');
+      alert('️ Keranjang kosong!');
       return;
     }
 
@@ -209,19 +209,19 @@ export default function TokoScreen() {
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>💳 Metode Pembayaran:</label>
+          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}> Metode Pembayaran:</label>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               onClick={() => setPembayaran('Cash')}
               style={{ flex: 1, padding: '12px', background: pembayaran === 'Cash' ? '#4CAF50' : '#f5f5f5', color: pembayaran === 'Cash' ? 'white' : '#333', border: pembayaran === 'Cash' ? '2px solid #2E7D32' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
             >
-               Cash
+              💵 Cash
             </button>
             <button 
               onClick={() => setPembayaran('Credit')}
               style={{ flex: 1, padding: '12px', background: pembayaran === 'Credit' ? '#FF9800' : '#f5f5f5', color: pembayaran === 'Credit' ? 'white' : '#333', border: pembayaran === 'Credit' ? '2px solid #E65100' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
             >
-               Credit
+              💳 Credit
             </button>
           </div>
         </div>
@@ -248,14 +248,14 @@ export default function TokoScreen() {
           onClick={() => setSelectedToko(null)}
           style={{ marginBottom: '15px', background: 'none', border: 'none', color: '#1976D2', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}
         >
-          ️ Kembali ke Daftar Toko
+          ⬅️ Kembali ke Daftar Toko
         </button>
 
         <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #ddd', marginBottom: '20px' }}>
           <h2 style={{ margin: '0 0 10px 0', color: '#1976D2', textAlign: 'center' }}>{selectedToko.nama}</h2>
           <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}><strong>ID:</strong> {selectedToko.idToko}</p>
-          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>📍 {selectedToko.alamat}</p>
-          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}> {selectedToko.telepon}</p>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}> {selectedToko.alamat}</p>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>📞 {selectedToko.telepon}</p>
           {selectedToko.lokasi && (
             <p style={{ margin: '5px 0', fontSize: '14px', color: '#666' }}>🗺️ Koordinat: {selectedToko.lokasi}</p>
           )}
@@ -281,7 +281,7 @@ export default function TokoScreen() {
           </button>
         </div>
 
-        <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}> Riwayat Kunjungan</h3>
+        <h3 style={{ color: '#333', borderBottom: '2px solid #1976D2', paddingBottom: '5px' }}>📊 Riwayat Kunjungan</h3>
         
         <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
           <div style={{ flex: 1, background: '#E8F5E9', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
@@ -317,7 +317,7 @@ export default function TokoScreen() {
   // Tampilan Daftar Toko
   return (
     <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>🏪 Daftar Kunjungan Toko</h2>
+      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}> Daftar Kunjungan Toko</h2>
 
       <div style={{ marginBottom: '15px' }}>
         <input
@@ -330,7 +330,7 @@ export default function TokoScreen() {
       </div>
 
       <div style={{ marginBottom: '15px', padding: '12px', background: '#E3F2FD', borderRadius: '8px', fontSize: '13px', color: '#1565C0' }}>
-        💡 <strong>Info:</strong> Klik nama toko untuk melihat detail, navigasi ke lokasi, dan mulai transaksi. Untuk tambah/edit/hapus toko, gunakan menu <strong>Map Market</strong>.
+         <strong>Info:</strong> Klik nama toko untuk melihat detail, navigasi ke lokasi, dan mulai transaksi. Untuk tambah/edit/hapus toko, gunakan menu <strong>Map Market</strong>.
       </div>
 
       {filteredToko.length === 0 ? (
@@ -356,8 +356,8 @@ export default function TokoScreen() {
               }}
             >
               <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}> {toko.idToko} | 📍 {toko.alamat}</p>
-              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>📞 {toko.telepon}</p>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>🆔 {toko.idToko} | 📍 {toko.alamat}</p>
+              <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}> {toko.telepon}</p>
               <div style={{ marginTop: '8px', fontSize: '11px', color: '#1976D2', fontWeight: 'bold' }}>
                 Klik untuk lihat detail & transaksi ➡️
               </div>
