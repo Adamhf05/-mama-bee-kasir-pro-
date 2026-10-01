@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { Sidebar } from './components/Sidebar';
 import { LoginScreen } from './screens/LoginScreen';
-import { DashboardScreen } from './screens/DashboardScreen';
+import DashboardScreen from './screens/DashboardScreen';
 import { ProdukScreen } from './screens/ProdukScreen';
 import { KasirScreen } from './screens/KasirScreen';
 import TokoScreen from './screens/TokoScreen';
