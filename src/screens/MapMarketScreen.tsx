@@ -33,27 +33,31 @@ export default function MapMarketScreen() {
   const [center, setCenter] = useState<[number, number]>([-2.5489, 118.0149]);
 
   useEffect(() => {
-    const tokoData = localStorage.getItem('tokoData');
-    if (tokoData) {
-      const toko = JSON.parse(tokoData);
-      setTokoList([toko]);
-    }
+    try {
+      // Load dari master data (array)
+      const savedList = localStorage.getItem('tokoMasterData');
+      if (savedList) {
+        setTokoList(JSON.parse(savedList));
+      }
 
-    const savedFolders = localStorage.getItem('tokoFolders');
-    if (savedFolders) {
-      const parsed = JSON.parse(savedFolders);
-      setFolders(['Semua', ...parsed]);
-    }
+      const savedFolders = localStorage.getItem('tokoFolders');
+      if (savedFolders) {
+        const parsed = JSON.parse(savedFolders);
+        setFolders(['Semua', ...parsed]);
+      }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCenter([position.coords.latitude, position.coords.longitude]);
-        },
-        () => {
-          setCenter([-2.5489, 118.0149]);
-        }
-      );
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setCenter([position.coords.latitude, position.coords.longitude]);
+          },
+          () => {
+            setCenter([-2.5489, 118.0149]);
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error loading map data:', error);
     }
   }, []);
 
@@ -102,11 +106,11 @@ export default function MapMarketScreen() {
                     📍 {toko.alamat}
                   </p>
                   <p style={{ margin: '3px 0', fontSize: '12px', color: '#666' }}>
-                     {toko.telepon}
+                    📞 {toko.telepon}
                   </p>
                   {toko.deskripsi && (
                     <p style={{ margin: '3px 0', fontSize: '12px', color: '#999', fontStyle: 'italic' }}>
-                       {toko.deskripsi}
+                      📝 {toko.deskripsi}
                     </p>
                   )}
                   <div style={{ 
@@ -137,7 +141,7 @@ export default function MapMarketScreen() {
                         fontSize: '12px'
                       }}
                     >
-                       Navigasi
+                      🧭 Navigasi
                     </a>
                   )}
                 </div>
