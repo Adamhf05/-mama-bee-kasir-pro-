@@ -41,28 +41,40 @@ export default function TokoScreen() {
   const [showNewFolder, setShowNewFolder] = useState(false);
 
   useEffect(() => {
-    const savedToko = localStorage.getItem('tokoData');
-    if (savedToko) {
-      setToko(JSON.parse(savedToko));
-    } else {
-      const autoId = 'TOKO-' + Math.floor(Math.random() * 9000 + 1000);
-      setToko(prev => ({ ...prev, idToko: autoId }));
-    }
+    try {
+      const savedToko = localStorage.getItem('tokoData');
+      if (savedToko) {
+        setToko(JSON.parse(savedToko));
+      } else {
+        const autoId = 'TOKO-' + Math.floor(Math.random() * 9000 + 1000);
+        setToko(prev => ({ ...prev, idToko: autoId }));
+      }
 
-    const savedFolders = localStorage.getItem('tokoFolders');
-    if (savedFolders) {
-      setFolders(JSON.parse(savedFolders));
+      const savedFolders = localStorage.getItem('tokoFolders');
+      if (savedFolders) {
+        setFolders(JSON.parse(savedFolders));
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
     }
   }, []);
 
   const handleSave = () => {
-    if (!toko.nama) {
-      alert('Nama toko harus diisi!');
-      return;
+    try {
+      if (!toko.nama) {
+        alert('️ Nama toko harus diisi!');
+        return;
+      }
+      
+      console.log('Saving toko data:', toko);
+      localStorage.setItem('tokoData', JSON.stringify(toko));
+      setSaved(true);
+      alert('✅ Data toko berhasil disimpan!');
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Error saving data:', error);
+      alert('❌ Gagal menyimpan data: ' + (error as Error).message);
     }
-    localStorage.setItem('tokoData', JSON.stringify(toko));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,13 +94,14 @@ export default function TokoScreen() {
         (position) => {
           const lokasi = `${position.coords.latitude},${position.coords.longitude}`;
           setToko({ ...toko, lokasi });
+          alert('✅ Lokasi berhasil diambil: ' + lokasi);
         },
         (error) => {
-          alert('Gagal mendapatkan lokasi: ' + error.message + '\n\nTips: Buka Settings → Apps → Mama Bee Kasir Pro → Permissions → Location → Allow');
+          alert('❌ Gagal mendapatkan lokasi: ' + error.message + '\n\nTips: Buka Settings → Apps → Mama Bee Kasir Pro → Permissions → Location → Allow');
         }
       );
     } else {
-      alert('Browser tidak mendukung geolocation');
+      alert('❌ Browser tidak mendukung geolocation');
     }
   };
 
@@ -104,8 +117,8 @@ export default function TokoScreen() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: '20px', color: '#1976D2' }}> Profil Toko</h2>
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', paddingBottom: '100px' }}>
+      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>Profil Toko</h2>
       
       {saved && (
         <div style={{
@@ -136,7 +149,8 @@ export default function TokoScreen() {
             borderRadius: '8px',
             fontSize: '14px',
             background: '#E3F2FD',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            boxSizing: 'border-box'
           }}
         />
         <small style={{ color: '#666' }}>ID unik untuk pencarian di Map Market</small>
@@ -156,7 +170,8 @@ export default function TokoScreen() {
             padding: '10px',
             border: '1px solid #ddd',
             borderRadius: '8px',
-            fontSize: '14px'
+            fontSize: '14px',
+            boxSizing: 'border-box'
           }}
         />
       </div>
@@ -176,7 +191,8 @@ export default function TokoScreen() {
             border: '1px solid #ddd',
             borderRadius: '8px',
             fontSize: '14px',
-            resize: 'vertical'
+            resize: 'vertical',
+            boxSizing: 'border-box'
           }}
         />
       </div>
@@ -195,7 +211,8 @@ export default function TokoScreen() {
             padding: '10px',
             border: '1px solid #ddd',
             borderRadius: '8px',
-            fontSize: '14px'
+            fontSize: '14px',
+            boxSizing: 'border-box'
           }}
         />
       </div>
@@ -215,7 +232,8 @@ export default function TokoScreen() {
             border: '1px solid #ddd',
             borderRadius: '8px',
             fontSize: '14px',
-            resize: 'vertical'
+            resize: 'vertical',
+            boxSizing: 'border-box'
           }}
         />
       </div>
@@ -241,7 +259,8 @@ export default function TokoScreen() {
                 border: '1px solid #ddd',
                 borderRadius: '8px',
                 fontSize: '14px',
-                background: 'white'
+                background: 'white',
+                boxSizing: 'border-box'
               }}
             >
               {folders.map(f => (
@@ -401,10 +420,16 @@ export default function TokoScreen() {
           borderRadius: '8px',
           fontSize: '16px',
           fontWeight: 'bold',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          position: 'fixed',
+          bottom: '0',
+          left: '0',
+          right: '0',
+          zIndex: 1000,
+          boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
         }}
       >
-          Simpan Data Toko
+        💾 Simpan Data Toko
       </button>
     </div>
   );
