@@ -1,6 +1,4 @@
 import html2canvas from 'html2canvas';
-import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 
 export async function generateReceiptImage(element: HTMLDivElement): Promise<string> {
   const canvas = await html2canvas(element, {
@@ -9,8 +7,126 @@ export async function generateReceiptImage(element: HTMLDivElement): Promise<str
     useCORS: true,
     logging: false
   });
-  
   return canvas.toDataURL('image/png');
+}
+
+// Fungsi untuk menampilkan gambar struk dengan tombol refresh
+export function showReceiptImage(
+  imageData: string, 
+  tokoNama: string, 
+  mode: 'share' | 'download'
+): void {
+  // Buat modal/overlay di halaman yang sama (TIDAK buka tab baru!)
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+  `;
+
+  const title = mode === 'share' ? 'Share Struk' : 'Simpan Struk';
+  const instruction = mode === 'share'
+    ? `Cara Share ke WhatsApp:<br/>1. <b>Tekan lama (long press)</b> gambar di atas<br/>2. Pilih "Share" atau "Bagikan"<br/>3. Pilih WhatsApp<br/>4. Pilih kontak tujuan`
+    : `Cara Simpan Gambar:<br/>1. <b>Tekan lama (long press)</b> gambar di atas<br/>2. Pilih "Save image" atau "Simpan gambar"<br/>3. Gambar tersimpan di Galeri HP`;
+
+  modal.innerHTML = `
+    <div style="
+      background: white;
+      border-radius: 16px;
+      padding: 25px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    ">
+      <h2 style="color: #1976D2; text-align: center; margin-bottom: 20px;">
+        ${title} - ${tokoNama}
+      </h2>
+      
+      <div style="
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        border: 2px dashed #ddd;
+      ">
+        <img src="${imageData}" 
+             alt="Struk ${tokoNama}" 
+             style="
+               max-width: 100%;
+               height: auto;
+               display: block;
+               margin: 0 auto;
+               border-radius: 8px;
+             " 
+        />
+      </div>
+
+      <div style="
+        background: #FFF9C4;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #333;
+      ">
+        ${instruction}
+      </div>
+
+      <div style="
+        background: #E3F2FD;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #1565C0;
+        margin-bottom: 20px;
+      ">
+        💡 <strong>Tips:</strong> Jika long-press tidak muncul opsi, coba screenshot layar ini.
+      </div>
+
+      <button id="closeModalBtn" style="
+        width: 100%;
+        padding: 14px;
+        background: #1976D2;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      ">
+        🔄 Tutup / Refresh
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Event listener untuk tombol close
+  const closeBtn = document.getElementById('closeModalBtn');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      document.body.removeChild(modal);
+    };
+  }
+
+  // Klik di luar modal untuk close
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+    }
+  };
 }
 
 export async function shareReceiptViaWhatsApp(
@@ -18,59 +134,30 @@ export async function shareReceiptViaWhatsApp(
   tokoNama: string
 ): Promise<void> {
   try {
-    const base64Data = imageData.split(',')[1];
-    const fileName = `struk-${tokoNama.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+    // Coba Web Share API (work di Chrome Android)
+    if (navigator.share && navigator.canShare) {
+      const response = await fetch(imageData);
+      const blob = await response.blob();
+      const file = new File([blob], `struk-${tokoNama}.png`, { type: 'image/png' });
+      
+      const shareData = {
+        files: [file],
+        title: `Struk Transaksi - ${tokoNama}`,
+        text: `Struk dari Mama Bee Kasir Pro`
+      };
+
+      if (navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        return;
+      }
+    }
     
-    // Save file to cache directory
-    await Filesystem.writeFile({
-      path: fileName,
-      data: base64Data,
-      directory: Directory.Cache,
-    });
-    
-    // Get file URI
-    const statResult = await Filesystem.stat({
-      path: fileName,
-      directory: Directory.Cache,
-    });
-    
-    // Share via Capacitor Share plugin
-    await Share.share({
-      title: `Struk Transaksi - ${tokoNama}`,
-      text: `Struk transaksi dari Mama Bee Kasir Pro untuk ${tokoNama}`,
-      url: statResult.uri,
-      dialogTitle: 'Kirim Struk via'
-    });
+    // Fallback: Tampilkan modal dengan gambar
+    showReceiptImage(imageData, tokoNama, 'share');
     
   } catch (error) {
     console.error('Share error:', error);
-    
-    // Fallback: Tampilkan gambar di tab baru
-    try {
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(`
-          <html>
-            <head><title>Struk - ${tokoNama}</title></head>
-            <body style="text-align:center; padding:20px; background:#f5f5f5;">
-              <h3>Struk Transaksi - ${tokoNama}</h3>
-              <img src="${imageData}" style="max-width:100%; border:1px solid #ddd; margin:20px 0;" />
-              <p style="color:#666; font-size:14px;">
-                📱 <strong>Cara share ke WhatsApp:</strong><br/>
-                1. Long press gambar di atas<br/>
-                2. Pilih "Share" atau "Bagikan"<br/>
-                3. Pilih WhatsApp<br/>
-                4. Pilih kontak tujuan
-              </p>
-            </body>
-          </html>
-        `);
-      } else {
-        alert('Gagal share. Silakan screenshot struk dan share manual.');
-      }
-    } catch (fallbackError) {
-      alert('Gagal share. Silakan screenshot struk dan share manual via WhatsApp.');
-    }
+    showReceiptImage(imageData, tokoNama, 'share');
   }
 }
 
@@ -79,75 +166,20 @@ export async function downloadReceiptImage(
   tokoNama: string
 ): Promise<void> {
   try {
-    const base64Data = imageData.split(',')[1];
-    const fileName = `struk-${tokoNama.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+    // Coba download langsung
+    const link = document.createElement('a');
+    link.href = imageData;
+    link.download = `struk-${tokoNama.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
-    // Try ExternalStorage first (Android 10+, accessible from gallery)
-    try {
-      await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.ExternalStorage,
-      });
-      
-      alert(`✅ Struk berhasil disimpan!\n\nFile: ${fileName}\n\nSilakan cek di:\n• File Manager > Pictures\n• Atau Galeri HP`);
-      return;
-    } catch (extStorageError) {
-      console.log('ExternalStorage failed:', extStorageError);
-    }
-    
-    // Fallback to External
-    try {
-      await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.External,
-      });
-      
-      alert(`✅ Struk berhasil disimpan!\n\nFile: ${fileName}\n\nSilakan cek di:\n• File Manager > Pictures\n• Atau Galeri HP`);
-      return;
-    } catch (extError) {
-      console.log('External failed:', extError);
-    }
-    
-    // Fallback to Data directory
-    try {
-      await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.Data,
-      });
-      
-      alert(`✅ Struk berhasil disimpan!\n\nFile: ${fileName}\n\nLokasi: Internal storage > Android > data`);
-      return;
-    } catch (dataError) {
-      console.log('Data failed:', dataError);
-    }
-    
-    // Final fallback: Tampilkan gambar di tab baru
-    const newWindow = window.open('', '_blank');
-    if (newWindow) {
-      newWindow.document.write(`
-        <html>
-          <head><title>Struk - ${tokoNama}</title></head>
-          <body style="text-align:center; padding:20px; background:#f5f5f5;">
-            <h3>Struk Transaksi - ${tokoNama}</h3>
-            <img src="${imageData}" style="max-width:100%; border:1px solid #ddd; margin:20px 0;" />
-            <p style="color:#666; font-size:14px;">
-              💾 <strong>Cara simpan gambar:</strong><br/>
-              1. Long press gambar di atas<br/>
-              2. Pilih "Save image" atau "Simpan gambar"<br/>
-              3. Gambar tersimpan di galeri HP
-            </p>
-          </body>
-        </html>
-      `);
-    } else {
-      alert('Gagal menyimpan. Silakan screenshot struk.');
-    }
+    alert(`✅ Struk sedang didownload!\n\nCek di folder Downloads.`);
     
   } catch (error) {
     console.error('Download error:', error);
-    alert('Gagal menyimpan. Silakan screenshot struk.');
   }
+  
+  // Selalu tampilkan modal sebagai backup
+  showReceiptImage(imageData, tokoNama, 'download');
 }

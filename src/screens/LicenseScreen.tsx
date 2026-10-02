@@ -3,9 +3,9 @@ import {
   checkLicenseStatus, 
   activateLicense, 
   getDeviceHash, 
-  getInstallDate,
-  formatDate,
-  clearLicense
+   
+   
+  clearLicense 
 } from '../utils/licenseManager';
 import type { LicenseStatus } from '../utils/licenseManager';
 
@@ -19,12 +19,15 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
   const [status, setStatus] = useState<LicenseStatus>('trial');
   const [daysRemaining, setDaysRemaining] = useState(0);
-  const [showDebug, setShowDebug] = useState(false);
+  
+  const [deviceHash, setDeviceHash] = useState('');
+  const [showHash, setShowHash] = useState(false);
 
   useEffect(() => {
     const result = checkLicenseStatus();
     setStatus(result.status);
     setDaysRemaining(result.daysRemaining);
+    setDeviceHash(getDeviceHash());
   }, []);
 
   const handleActivate = () => {
@@ -52,6 +55,14 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
     }
   };
 
+  const handleCopyHash = () => {
+    navigator.clipboard.writeText(deviceHash).then(() => {
+      alert('✅ Device Hash disalin! Kirim ke admin via WhatsApp.');
+    }).catch(() => {
+      alert('Gagal copy. Silakan screenshot dan kirim ke admin.');
+    });
+  };
+
   const getStatusColor = () => {
     if (status === 'active') return '#4CAF50';
     if (status === 'trial') return '#FF9800';
@@ -65,19 +76,19 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
+    <div style={{
+      minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '20px'
     }}>
-      <div style={{ 
-        background: 'white', 
-        borderRadius: '16px', 
-        padding: '30px', 
-        maxWidth: '450px', 
+      <div style={{
+        background: 'white',
+        borderRadius: '16px',
+        padding: '30px',
+        maxWidth: '450px',
         width: '100%',
         boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
       }}>
@@ -93,211 +104,195 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
         </div>
 
         {/* Status Badge */}
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '10px', 
+        <div style={{
+          textAlign: 'center',
+          padding: '10px',
           background: getStatusColor() + '20',
           borderRadius: '8px',
           marginBottom: '20px'
         }}>
-          <div style={{ fontSize: '12px', color: '#666' }}>Status Lisensi</div>
-          <div style={{ 
-            fontSize: '20px', 
+          <span style={{ 
+            color: getStatusColor(), 
             fontWeight: 'bold', 
-            color: getStatusColor(),
-            marginTop: '5px'
+            fontSize: '16px' 
           }}>
-            {getStatusText()}
-          </div>
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-            {status === 'trial' && `Sisa trial: ${daysRemaining} hari`}
-            {status === 'active' && `Aktif selama ${daysRemaining} hari lagi`}
-            {status === 'expired' && 'Lisensi telah berakhir'}
-          </div>
-        </div>
-
-        {/* Info Box */}
-        <div style={{ 
-          background: '#E3F2FD', 
-          padding: '15px', 
-          borderRadius: '8px', 
-          marginBottom: '20px',
-          fontSize: '13px',
-          color: '#1565C0'
-        }}>
+            Status: {getStatusText()}
+          </span>
           {status === 'trial' && (
-            <>
-              <strong>🎉 Selamat! Anda dalam masa trial {daysRemaining} hari.</strong>
-              <p style={{ margin: '10px 0 0 0', fontSize: '12px' }}>
-                Nikmati semua fitur Mama Bee Kasir Pro. Setelah trial berakhir, 
-                aktifkan lisensi untuk继续使用.
-              </p>
-            </>
-          )}
-          {status === 'expired' && (
-            <>
-              <strong>⚠️ Masa trial telah berakhir!</strong>
-              <p style={{ margin: '10px 0 0 0', fontSize: '12px' }}>
-                Aktifkan lisensi untuk继续使用 semua fitur.
-              </p>
-            </>
-          )}
-          {status === 'active' && (
-            <>
-              <strong>✅ Lisensi aktif!</strong>
-              <p style={{ margin: '10px 0 0 0', fontSize: '12px' }}>
-                Terima kasih telah berlangganan Mama Bee Kasir Pro.
-              </p>
-            </>
+            <div style={{ fontSize: '13px', color: '#666', marginTop: '5px' }}>
+              Sisa {daysRemaining} hari trial
+            </div>
           )}
         </div>
 
-        {/* Pricing Info */}
-        <div style={{ 
-          background: '#FFF9C4', 
-          padding: '15px', 
-          borderRadius: '8px', 
-          marginBottom: '20px',
-          fontSize: '13px'
-        }}>
-          <strong style={{ color: '#F57F17' }}>💰 Paket Langganan:</strong>
-          <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>📅 Bulanan</span>
-              <strong style={{ color: '#1976D2' }}>Rp 50.000/bulan</strong>
+        {/* Device Hash Section */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
+            📱 Device Hash Anda:
+          </label>
+          
+          {showHash ? (
+            <div style={{ 
+              background: '#f5f5f5', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              marginBottom: '10px',
+              border: '2px dashed #1976D2'
+            }}>
+              <div style={{ 
+                fontSize: '16px', 
+                fontWeight: 'bold', 
+                color: '#1976D2',
+                textAlign: 'center',
+                marginBottom: '10px',
+                wordBreak: 'break-all'
+              }}>
+                {deviceHash}
+              </div>
+              <button
+                onClick={handleCopyHash}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#1976D2',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                📋 Copy Device Hash
+              </button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>📆 Tahunan</span>
-              <strong style={{ color: '#1976D2' }}>Rp 500.000/tahun</strong>
-            </div>
-          </div>
-          <p style={{ margin: '10px 0 0 0', fontSize: '11px', color: '#666' }}>
-            Hubungi admin via WhatsApp untuk membeli lisensi
-          </p>
-        </div>
-
-        {/* Activation Form */}
-        {(status === 'trial' || status === 'expired') && (
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ fontSize: '12px', color: '#666', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-               Masukkan Kode Lisensi:
-            </label>
-            <input
-              type="text"
-              value={licenseKey}
-              onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
-              placeholder="MAMA-XXXX-XXXX-XXXX"
+          ) : (
+            <button
+              onClick={() => setShowHash(true)}
               style={{
                 width: '100%',
                 padding: '12px',
-                border: '2px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontFamily: 'monospace',
-                boxSizing: 'border-box',
-                marginBottom: '10px'
-              }}
-            />
-            <button
-              onClick={handleActivate}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: '#4CAF50',
+                background: '#FF9800',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '16px',
+                fontSize: '14px',
                 fontWeight: 'bold',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                marginBottom: '10px'
               }}
             >
-              ✅ Aktivasi Lisensi
+              👁️ Tampilkan Device Hash
             </button>
+          )}
+
+          <div style={{ 
+            fontSize: '12px', 
+            color: '#666', 
+            textAlign: 'center',
+            background: '#FFF9C4',
+            padding: '10px',
+            borderRadius: '6px'
+          }}>
+            💡 Kirim Device Hash ini ke admin via WhatsApp untuk mendapatkan kode lisensi
           </div>
-        )}
+        </div>
+
+        {/* License Key Input */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
+            🔑 Masukkan Kode Lisensi:
+          </label>
+          <input
+            type="text"
+            value={licenseKey}
+            onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
+            placeholder="MAMA-XXXX-XXXX-XXX"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '2px solid #ddd',
+              borderRadius: '8px',
+              fontSize: '14px',
+              boxSizing: 'border-box',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px'
+            }}
+          />
+        </div>
 
         {/* Message */}
         {message && (
           <div style={{
             padding: '12px',
-            background: messageType === 'success' ? '#E8F5E9' : messageType === 'error' ? '#FFEBEE' : '#E3F2FD',
-            color: messageType === 'success' ? '#2E7D32' : messageType === 'error' ? '#C62828' : '#1565C0',
             borderRadius: '8px',
-            fontSize: '13px',
-            marginBottom: '15px',
+            marginBottom: '20px',
+            background: messageType === 'success' ? '#E8F5E9' : 
+                       messageType === 'error' ? '#FFEBEE' : '#E3F2FD',
+            color: messageType === 'success' ? '#2E7D32' : 
+                   messageType === 'error' ? '#C62828' : '#1565C0',
+            fontSize: '14px',
             textAlign: 'center'
           }}>
             {message}
           </div>
         )}
 
-        {/* Contact Info */}
-        <div style={{
-          background: '#F5F5F5',
-          padding: '15px',
-          borderRadius: '8px',
-          textAlign: 'center',
-          fontSize: '12px',
-          color: '#666'
-        }}>
-          <strong>📱 Hubungi Admin:</strong>
-          <p style={{ margin: '8px 0 0 0' }}>
-            WhatsApp: <a href="https://wa.me/6285677455555" style={{ color: '#25D366', textDecoration: 'none', fontWeight: 'bold' }}>
-              0856-7745-5555
-            </a>
-          </p>
-          <p style={{ margin: '5px 0 0 0', fontSize: '11px' }}>
-            Kirim pesan untuk membeli lisensi
-          </p>
-        </div>
+        {/* Activate Button */}
+        <button
+          onClick={handleActivate}
+          style={{
+            width: '100%',
+            padding: '14px',
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            marginBottom: '10px'
+          }}
+        >
+          ✅ Aktifkan Lisensi
+        </button>
 
-        {/* Debug (hidden, for admin) */}
-        <div style={{ marginTop: '15px', textAlign: 'center' }}>
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#999',
-              fontSize: '11px',
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-          >
-            {showDebug ? 'Sembunyikan' : 'Tampilkan'} Info Device
-          </button>
-          
-          {showDebug && (
-            <div style={{
-              marginTop: '10px',
-              padding: '10px',
-              background: '#f5f5f5',
-              borderRadius: '6px',
-              fontSize: '10px',
-              fontFamily: 'monospace',
-              color: '#666',
-              textAlign: 'left'
-            }}>
-              <div><strong>Device Hash:</strong> {getDeviceHash()}</div>
-              <div><strong>Install Date:</strong> {formatDate(getInstallDate().toISOString())}</div>
-              <button
-                onClick={handleResetTrial}
-                style={{
-                  marginTop: '10px',
-                  padding: '6px 12px',
-                  background: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                Reset Trial (Testing)
-              </button>
-            </div>
-          )}
+        {/* Reset Trial Button (Debug) */}
+        <button
+          onClick={handleResetTrial}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#9E9E9E',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}
+        >
+          🔄 Reset Trial (Testing Only)
+        </button>
+
+        {/* Instructions */}
+        <div style={{
+          marginTop: '20px',
+          padding: '15px',
+          background: '#FFF9C4',
+          borderRadius: '8px',
+          fontSize: '12px',
+          color: '#666',
+          lineHeight: '1.6'
+        }}>
+          <strong>📝 Cara Aktivasi:</strong>
+          <ol style={{ margin: '8px 0', paddingLeft: '20px' }}>
+            <li>Klik "Tampilkan Device Hash" di atas</li>
+            <li>Copy & kirim ke admin via WhatsApp</li>
+            <li>Admin akan kirim kode lisensi</li>
+            <li>Masukkan kode di kolom di atas</li>
+            <li>Klik "Aktifkan Lisensi"</li>
+          </ol>
         </div>
       </div>
     </div>

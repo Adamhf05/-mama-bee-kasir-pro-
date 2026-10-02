@@ -20,14 +20,43 @@ const WARNA_PIN = [
 const HARI_LIST = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 function createCustomIcon(color: string) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24c0-6.627-5.373-12-12-12z" fill="${color}" stroke="white" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="4" fill="white"/>
+    </svg>
+  `;
+  
   return L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
+    className: 'custom-pin-icon',
+    html: svg,
+    iconSize: [24, 36],
+    iconAnchor: [12, 36],
+    popupAnchor: [0, -36]
   });
 }
+
+const parseKoordinat = (lokasi: string): [number, number] | null => {
+  if (!lokasi) return null;
+  const parts = lokasi.split(',').map(s => parseFloat(s.trim()));
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return [parts[0], parts[1]];
+  }
+  return null;
+};
+
+const generateIdToko = (existingIds: string[]): string => {
+  const prefix = 'TOKO-';
+  let counter = 1;
+  let newId = `${prefix}${String(counter).padStart(3, '0')}`;
+  
+  while (existingIds.includes(newId)) {
+    counter++;
+    newId = `${prefix}${String(counter).padStart(3, '0')}`;
+  }
+  
+  return newId;
+};
 
 export default function MapMarketScreen() {
   const [tokoList, setTokoList] = useState<SalesToko[]>([]);
@@ -46,19 +75,18 @@ export default function MapMarketScreen() {
 
   const loadData = async () => {
     try {
-      // Migrasi dari localStorage jika ada
       const migrated = await TokoRepo.migrateFromLocalStorage();
       if (migrated > 0) {
-        alert(`✅ Berhasil migrasi ${migrated} toko dari versi lama ke database baru!`);
+        alert(`✅ Berhasil migrasi ${migrated} toko dari versi lama!`);
       }
-      
+
       const toko = await TokoRepo.getAll();
       setTokoList(toko);
-      
+
       if (toko.length > 0 && toko[0].lokasi) {
-        const [lat, lng] = toko[0].lokasi.split(',').map(Number);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          setMapCenter([lat, lng]);
+        const koordinat = parseKoordinat(toko[0].lokasi);
+        if (koordinat) {
+          setMapCenter(koordinat);
         }
       }
     } catch (e) {
@@ -72,7 +100,7 @@ export default function MapMarketScreen() {
       if (status.location !== 'granted') {
         const result = await Geolocation.requestPermissions();
         if (result.location !== 'granted') {
-          alert('⚠️ Izin lokasi ditolak. Buka Settings → Apps → Mama Bee Kasir Pro → Permissions → Location → Allow');
+          alert('️ Izin lokasi ditolak. Buka Settings → Apps → Mama Bee Kasir Pro → Permissions → Location → Allow');
           return false;
         }
       }
@@ -89,264 +117,200 @@ export default function MapMarketScreen() {
       if (!hasPermission) return;
 
       alert('📍 Mengambil lokasi saat ini... Mohon tunggu.');
-      
+
       const coordinates = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0
       });
-      
+
       const lat = coordinates.coords.latitude;
       const lng = coordinates.coords.longitude;
-      const lokasiStr = `${lat}, ${lng}`;
       
-      setCurrentToko({...currentToko, lokasi: lokasiStr});
+      setCurrentToko(prev => ({
+        ...prev,
+        lokasi: `${lat}, ${lng}`
+      }));
       setMapCenter([lat, lng]);
       setMapZoom(16);
-      alert(`✅ Lokasi berhasil didapat!\n${lokasiStr}`);
-    } catch (error) {
-      console.error('Geolocation error:', error);
-      alert('❌ Gagal mendapatkan lokasi.\n\nPastikan:\n1. GPS aktif di HP\n2. Izin lokasi diberikan\n3. Ada sinyal GPS yang cukup');
+      
+      alert(`✅ Lokasi didapat: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    } catch (e) {
+      console.error('Geolocation error:', e);
+      alert('❌ Gagal mengambil lokasi. Pastikan GPS aktif dan izin diberikan.');
     }
   };
 
-  const toggleHari = (hari: string) => {
-    const current = currentToko.hariKunjungan || [];
-    if (current.includes(hari)) {
-      setCurrentToko({...currentToko, hariKunjungan: current.filter(h => h !== hari)});
-    } else {
-      setCurrentToko({...currentToko, hariKunjungan: [...current, hari]});
-    }
-  };
-
-  const handleSave = async () => {
+  const handleOpenGoogleMaps = async (lokasi: string) => {
     try {
-      if (!currentToko.idToko || !currentToko.nama || !currentToko.lokasi) {
-        alert('⚠️ ID Toko, Nama, dan Lokasi wajib diisi!');
-        return;
-      }
+      await Browser.open({ url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lokasi)}` });
+    } catch (e) {
+      console.error('Browser open error:', e);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lokasi)}`, '_blank');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentToko.nama || !currentToko.lokasi || !currentToko.idToko) {
+      alert('⚠️ ID Toko, Nama Toko, dan Lokasi wajib diisi!');
+      return;
+    }
+
+    const koordinat = parseKoordinat(currentToko.lokasi);
+    if (!koordinat) {
+      alert('⚠️ Format koordinat salah! Contoh: -3.3198, 114.5908');
+      return;
+    }
+
+    // Validasi ID Toko unik (kecuali saat edit toko yang sama)
+    const idExists = tokoList.some(t => t.idToko === currentToko.idToko && t.idToko !== editId);
+    if (idExists) {
+      alert(`⚠️ ID Toko "${currentToko.idToko}" sudah digunakan! Pilih ID lain.`);
+      return;
+    }
+
+    try {
+      const tokoData: SalesToko = {
+        idToko: currentToko.idToko,
+        nama: currentToko.nama,
+        alamat: currentToko.alamat || '',
+        telepon: currentToko.telepon || '',
+        lokasi: currentToko.lokasi,
+        warnaPin: currentToko.warnaPin || '#2196F3',
+        folder: currentToko.folder || 'Default',
+        hariKunjungan: currentToko.hariKunjungan || [],
+        catatan: currentToko.catatan || '',
+        createdAt: editId ? (tokoList.find(t => t.idToko === editId)?.createdAt || new Date()) : new Date(),
+        updatedAt: new Date()
+      };
 
       if (editId) {
-        await TokoRepo.update(editId, currentToko);
-        alert('✅ Data toko berhasil diupdate!');
+        await TokoRepo.update(tokoData.idToko, tokoData);
+        alert('✅ Toko berhasil diupdate!');
       } else {
-        const existing = await TokoRepo.getById(currentToko.idToko!);
-        if (existing) {
-          alert('⚠️ ID Toko sudah ada! Gunakan ID yang berbeda.');
-          return;
-        }
-        await TokoRepo.add({
-          idToko: currentToko.idToko!,
-          nama: currentToko.nama!,
-          alamat: currentToko.alamat || '',
-          telepon: currentToko.telepon || '',
-          lokasi: currentToko.lokasi!,
-          warnaPin: currentToko.warnaPin || '#2196F3',
-          folder: currentToko.folder || 'Default',
-          hariKunjungan: currentToko.hariKunjungan || [],
-          catatan: currentToko.catatan || '',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-        alert('✅ Toko baru berhasil ditambahkan!');
+        await TokoRepo.add(tokoData);
+        alert('✅ Toko berhasil disimpan!');
       }
 
-      await loadData();
       setShowForm(false);
       setEditId(null);
       setCurrentToko({
         idToko: '', nama: '', alamat: '', telepon: '', lokasi: '', warnaPin: '#2196F3',
         folder: 'Default', hariKunjungan: [], catatan: ''
       });
-    } catch (e) {
-      alert('❌ Gagal menyimpan: ' + (e as Error).message);
+      loadData();
+    } catch (error) {
+      console.error('Error saving toko:', error);
+      alert('❌ Gagal menyimpan toko');
     }
+  };
+
+  const handleEdit = (toko: SalesToko) => {
+    setCurrentToko({
+      idToko: toko.idToko,
+      nama: toko.nama,
+      alamat: toko.alamat,
+      telepon: toko.telepon,
+      lokasi: toko.lokasi,
+      warnaPin: toko.warnaPin || '#2196F3',
+      folder: toko.folder || 'Default',
+      hariKunjungan: toko.hariKunjungan || [],
+      catatan: toko.catatan || ''
+    });
+    setEditId(toko.idToko);
+    setShowForm(true);
   };
 
   const handleDelete = async (idToko: string) => {
-    if (confirm('Yakin hapus toko ini? Semua riwayat kunjungan juga akan dihapus.')) {
-      await TokoRepo.delete(idToko);
-      await loadData();
-    }
-  };
-
-  const handleClearAll = async () => {
-    if (confirm('Hapus SEMUA data toko? Tindakan ini tidak bisa dibatalkan!')) {
-      for (const toko of tokoList) {
-        await TokoRepo.delete(toko.idToko);
+    if (confirm('Yakin hapus toko ini?')) {
+      try {
+        await TokoRepo.delete(idToko);
+        loadData();
+        alert('✅ Toko berhasil dihapus!');
+      } catch (error) {
+        console.error('Error deleting toko:', error);
+        alert('❌ Gagal menghapus toko');
       }
-      await loadData();
     }
   };
 
-  const handleOpenGoogleMaps = () => {
-    Browser.open({ url: 'https://www.google.com/maps' });
-    alert('📍 Cara dapat koordinat:\n1. Buka Google Maps\n2. Tekan lama di lokasi toko\n3. Copy koordinat yang muncul\n4. Paste di field "Koordinat"');
+  const toggleHari = (hari: string) => {
+    const currentHari = currentToko.hariKunjungan || [];
+    const newHari = currentHari.includes(hari)
+      ? currentHari.filter(h => h !== hari)
+      : [...currentHari, hari];
+    setCurrentToko({ ...currentToko, hariKunjungan: newHari });
   };
 
-  const handleNavigate = (lokasi: string) => {
-    Browser.open({ url: `https://www.google.com/maps/dir/?api=1&destination=${lokasi}` });
+  const handleAddNew = () => {
+    const newId = generateIdToko(tokoList.map(t => t.idToko));
+    setCurrentToko({ 
+      idToko: newId, 
+      nama: '', 
+      alamat: '', 
+      telepon: '', 
+      lokasi: '', 
+      warnaPin: '#2196F3', 
+      folder: 'Default', 
+      hariKunjungan: [], 
+      catatan: '' 
+    });
+    setEditId(null);
+    setShowForm(true);
   };
 
-  // Form Tambah/Edit Toko
-  if (showForm) {
-    return (
-      <div style={{ padding: '20px', paddingBottom: '100px', minHeight: '100vh', background: '#f5f5f5' }}>
-        <h2 style={{ color: '#1976D2', textAlign: 'center', marginTop: '10px' }}>
-          {editId ? '✏️ Edit Data Toko' : '➕ Tambah Toko Baru'}
-        </h2>
-
-        <div style={{ background: '#E3F2FD', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontSize: '13px', color: '#1565C0' }}>
-          💡 <strong>Cara Input Lokasi:</strong><br/>
-          • Klik "📍 Ambil Lokasi Saat Ini" untuk GPS otomatis<br/>
-          • Atau buka Google Maps → tekan lama lokasi → copy koordinat
-        </div>
-        
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>ID Toko (Unik)</label>
-          <input 
-            type="text" 
-            value={currentToko.idToko || ''}
-            onChange={(e) => setCurrentToko({...currentToko, idToko: e.target.value})}
-            placeholder="Contoh: TOKO-001, BDG-01"
-            style={{ width: '100%', padding: '10px', border: '2px solid #1976D2', borderRadius: '8px', boxSizing: 'border-box', background: '#E3F2FD', fontWeight: 'bold' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Nama Toko</label>
-          <input 
-            type="text" 
-            value={currentToko.nama || ''}
-            onChange={(e) => setCurrentToko({...currentToko, nama: e.target.value})}
-            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Alamat</label>
-          <textarea 
-            value={currentToko.alamat || ''}
-            onChange={(e) => setCurrentToko({...currentToko, alamat: e.target.value})}
-            rows={2}
-            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>No. Telepon</label>
-          <input 
-            type="tel" 
-            value={currentToko.telepon || ''}
-            onChange={(e) => setCurrentToko({...currentToko, telepon: e.target.value})}
-            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Koordinat Lokasi (Lat,Lng)</label>
-          <input 
-            type="text" 
-            value={currentToko.lokasi || ''}
-            onChange={(e) => setCurrentToko({...currentToko, lokasi: e.target.value})}
-            placeholder="-3.3198, 114.5908"
-            style={{ width: '100%', padding: '10px', border: '2px solid #FF9800', borderRadius: '8px', boxSizing: 'border-box' }}
-          />
-          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-            <button onClick={handleGetCurrentLocation} style={{ flex: 1, padding: '12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>📍 Ambil Lokasi (GPS)</button>
-            <button onClick={handleOpenGoogleMaps} style={{ flex: 1, padding: '12px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>🗺️ Google Maps</button>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Warna Pin (7 Pilihan)</label>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            {WARNA_PIN.map(w => (
-              <div key={w.value} style={{ textAlign: 'center' }}>
-                <button onClick={() => setCurrentToko({...currentToko, warnaPin: w.value})} style={{ width: '50px', height: '50px', background: w.value, border: currentToko.warnaPin === w.value ? '4px solid #000' : '2px solid #ddd', borderRadius: '50%', cursor: 'pointer', transform: currentToko.warnaPin === w.value ? 'scale(1.1)' : 'scale(1)' }} />
-                <div style={{ fontSize: '10px', marginTop: '3px', color: '#666' }}>{w.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>📅 Hari Kunjungan (Pilih minimal 1)</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-            {HARI_LIST.map(hari => {
-              const selected = (currentToko.hariKunjungan || []).includes(hari);
-              return (
-                <button key={hari} onClick={() => toggleHari(hari)} style={{ padding: '10px', background: selected ? '#1976D2' : '#f5f5f5', color: selected ? 'white' : '#333', border: selected ? '2px solid #0D47A1' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: selected ? 'bold' : 'normal', fontSize: '12px' }}>
-                  {hari.substring(0, 3)} {selected ? '✓' : ''}
-                </button>
-              );
-            })}
-          </div>
-          <small style={{color:'#666', display: 'block', marginTop: '5px'}}>Pilih hari kapan sales akan kunjungi toko ini</small>
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Area / Folder</label>
-          <input 
-            type="text" 
-            value={currentToko.folder || ''}
-            onChange={(e) => setCurrentToko({...currentToko, folder: e.target.value})}
-            placeholder="Contoh: Area Utara, Zona A"
-            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', position: 'fixed', bottom: '0', left: '0', right: '0', padding: '10px', background: 'white', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
-          <button onClick={handleSave} style={{ flex: 1, padding: '12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold' }}>💾 Simpan</button>
-          <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: '12px', background: '#f44336', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold' }}>Batal</button>
-        </div>
-      </div>
-    );
-  }
-
-  // Tampilan Utama: Peta + Daftar Toko
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f5f5f5' }}>
-      <div style={{ padding: '15px 10px 10px 10px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', zIndex: 10 }}>
-        <h2 style={{ color: '#1976D2', textAlign: 'center', margin: '0 0 10px 0', fontSize: '20px' }}>🗺️ Map Market</h2>
-        <button 
-          onClick={() => {
-            setCurrentToko({ idToko: '', nama: '', alamat: '', telepon: '', lokasi: '', warnaPin: '#2196F3', folder: 'Default', hariKunjungan: [], catatan: '' });
-            setEditId(null);
-            setShowForm(true);
-          }}
-          style={{ width: '100%', padding: '12px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold' }}
-        >
-          ➕ Tambah Toko Baru
-        </button>
-      </div>
-
-      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: '100%', width: '100%' }}>
-          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {tokoList.map((toko, idx) => {
-            if (!toko.lokasi) return null;
-            const [lat, lng] = toko.lokasi.split(',').map(Number);
-            if (isNaN(lat) || isNaN(lng)) return null;
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {tokoList.map(toko => {
+            const koordinat = parseKoordinat(toko.lokasi);
+            if (!koordinat) return null;
+            
             return (
-              <Marker key={idx} position={[lat, lng]} icon={createCustomIcon(toko.warnaPin)}>
+              <Marker
+                key={toko.idToko}
+                position={koordinat}
+                icon={createCustomIcon(toko.warnaPin || '#2196F3')}
+              >
                 <Popup>
-                  <div style={{ minWidth: '180px' }}>
-                    <h3 style={{ margin: '0 0 5px 0', color: '#1976D2' }}>{toko.nama}</h3>
-                    <p style={{ margin: '3px 0', fontSize: '12px' }}><strong>ID:</strong> {toko.idToko}</p>
-                    <p style={{ margin: '3px 0', fontSize: '12px' }}>📍 {toko.alamat}</p>
-                    <p style={{ margin: '3px 0', fontSize: '12px' }}>📞 {toko.telepon}</p>
-                    {toko.hariKunjungan.length > 0 && (
-                      <div style={{ marginTop: '5px', display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                        {toko.hariKunjungan.map(h => (
-                          <span key={h} style={{ padding: '2px 6px', background: '#1976D2', color: 'white', borderRadius: '8px', fontSize: '10px' }}>{h.substring(0, 3)}</span>
-                        ))}
-                      </div>
+                  <div style={{ minWidth: '200px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#1976D2', fontSize: '16px' }}>{toko.nama}</h3>
+                    <p style={{ margin: '4px 0', fontSize: '11px', color: '#999' }}>ID: {toko.idToko}</p>
+                    {toko.alamat && <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>📍 {toko.alamat}</p>}
+                    {toko.telepon && <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>📞 {toko.telepon}</p>}
+                    {toko.hariKunjungan && toko.hariKunjungan.length > 0 && (
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#1976D2', fontWeight: 'bold' }}>
+                        📅 {toko.hariKunjungan.join(', ')}
+                      </p>
                     )}
-                    <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-                      <button onClick={() => handleNavigate(toko.lokasi)} style={{ flex: 1, padding: '6px', background: '#4285F4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>🧭 Navigasi</button>
-                      <button onClick={() => { setCurrentToko(toko); setEditId(toko.idToko); setShowForm(true); }} style={{ flex: 1, padding: '6px', background: '#FFC107', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✏️ Edit</button>
-                      <button onClick={() => handleDelete(toko.idToko)} style={{ padding: '6px', background: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>🗑️</button>
+                    <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => handleEdit(toko)}
+                        style={{ flex: 1, padding: '6px', background: '#1976D2', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(toko.idToko)}
+                        style={{ flex: 1, padding: '6px', background: '#F44336', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        🗑️ Hapus
+                      </button>
+                      {toko.lokasi && (
+                        <button
+                          onClick={() => handleOpenGoogleMaps(toko.lokasi)}
+                          style={{ flex: '1 1 100%', padding: '6px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', marginTop: '4px' }}
+                        >
+                          🗺️ Buka di Google Maps
+                        </button>
+                      )}
                     </div>
                   </div>
                 </Popup>
@@ -356,14 +320,174 @@ export default function MapMarketScreen() {
         </MapContainer>
       </div>
 
-      <div style={{ padding: '10px', background: 'white', boxShadow: '0 -2px 4px rgba(0,0,0,0.1)', zIndex: 10 }}>
-        <div style={{ textAlign: 'center', fontSize: '13px', color: '#666', marginBottom: '5px' }}>
-          📊 Total: <strong>{tokoList.length}</strong> toko tersimpan
-        </div>
-        {tokoList.length > 0 && (
-          <button onClick={handleClearAll} style={{ width: '100%', padding: '8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px' }}>🗑️ Hapus Semua Data</button>
-        )}
+      <div style={{ background: 'white', padding: '12px', borderTop: '1px solid #ddd', textAlign: 'center', fontSize: '14px', color: '#333' }}>
+         Total: <strong>{tokoList.length}</strong> toko tersimpan
       </div>
+
+      <button
+        onClick={handleAddNew}
+        style={{
+          position: 'absolute',
+          bottom: '80px',
+          right: '20px',
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: '#1976D2',
+          color: 'white',
+          border: 'none',
+          fontSize: '32px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+      >
+        +
+      </button>
+
+      {showForm && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto'
+        }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '25px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ color: '#1976D2', textAlign: 'center', marginBottom: '20px' }}>
+              {editId ? '✏️ Edit Toko' : '➕ Tambah Toko Baru'}
+            </h2>
+
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>ID Toko *</label>
+                <input
+                  type="text"
+                  required
+                  value={currentToko.idToko}
+                  onChange={(e) => setCurrentToko({ ...currentToko, idToko: e.target.value.toUpperCase() })}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', background: '#f5f5f5', fontWeight: 'bold' }}
+                  placeholder="TOKO-001"
+                />
+                <small style={{ fontSize: '11px', color: '#666' }}>Auto-generate, bisa diubah manual. Harus unik!</small>
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Nama Toko *</label>
+                <input
+                  type="text"
+                  required
+                  value={currentToko.nama}
+                  onChange={(e) => setCurrentToko({ ...currentToko, nama: e.target.value })}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  placeholder="Contoh: Toko Sejahtera"
+                />
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Alamat</label>
+                <textarea
+                  value={currentToko.alamat}
+                  onChange={(e) => setCurrentToko({ ...currentToko, alamat: e.target.value })}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', minHeight: '60px', boxSizing: 'border-box' }}
+                  placeholder="Alamat lengkap toko"
+                />
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>No. Telepon</label>
+                <input
+                  type="tel"
+                  value={currentToko.telepon}
+                  onChange={(e) => setCurrentToko({ ...currentToko, telepon: e.target.value })}
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  placeholder="08xxxxxxxxxx"
+                />
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Koordinat Lokasi (Lat, Lng) *</label>
+                <input
+                  type="text"
+                  required
+                  value={currentToko.lokasi}
+                  onChange={(e) => setCurrentToko({ ...currentToko, lokasi: e.target.value })}
+                  style={{ width: '100%', padding: '10px', border: '2px solid #FF9800', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  placeholder="-3.3198, 114.5908"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <button type="button" onClick={handleGetCurrentLocation} style={{ padding: '10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    📍 Ambil GPS
+                  </button>
+                  <button type="button" onClick={() => Browser.open({ url: 'https://www.google.com/maps' })} style={{ padding: '10px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    🗺️ Google Maps
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '10px', textAlign: 'center' }}>Warna Pin (7 Pilihan)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+                  {WARNA_PIN.map(warna => (
+                    <div key={warna.value} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      <div
+                        onClick={() => setCurrentToko({ ...currentToko, warnaPin: warna.value })}
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: warna.value,
+                          border: currentToko.warnaPin === warna.value ? '3px solid #333' : '2px solid #ddd',
+                          cursor: 'pointer',
+                          boxShadow: currentToko.warnaPin === warna.value ? '0 0 0 2px white, 0 0 0 4px #333' : 'none'
+                        }}
+                        title={warna.label}
+                      />
+                      <span style={{ fontSize: '10px', color: '#666' }}>{warna.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '10px', textAlign: 'center' }}>📅 Hari Kunjungan</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  {HARI_LIST.map(hari => (
+                    <button
+                      key={hari}
+                      type="button"
+                      onClick={() => toggleHari(hari)}
+                      style={{
+                        padding: '8px 4px',
+                        background: (currentToko.hariKunjungan || []).includes(hari) ? '#1976D2' : 'white',
+                        color: (currentToko.hariKunjungan || []).includes(hari) ? 'white' : '#333',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: (currentToko.hariKunjungan || []).includes(hari) ? 'bold' : 'normal',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {hari}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <button type="submit" style={{ padding: '14px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  💾 Simpan
+                </button>
+                <button type="button" onClick={() => { setShowForm(false); setEditId(null); }} style={{ padding: '14px', background: '#F44336', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  Batal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
