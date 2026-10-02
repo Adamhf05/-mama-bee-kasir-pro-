@@ -28,7 +28,6 @@ export function getDeviceHash(): string {
   ];
   const raw = components.join('|');
   
-  // Simple hash function
   let hash = 0;
   for (let i = 0; i < raw.length; i++) {
     const char = raw.charCodeAt(i);
@@ -42,11 +41,8 @@ export function getDeviceHash(): string {
 export function generateLicenseKey(type: LicenseType = 'monthly'): string {
   const deviceHash = getDeviceHash();
   const typeCode = type === 'monthly' ? 'M' : 'Y';
-  
-  // Generate random segment
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   
-  // Calculate checksum
   const raw = `${deviceHash}${typeCode}${random}`;
   let checksum = 0;
   for (let i = 0; i < raw.length; i++) {
@@ -58,8 +54,13 @@ export function generateLicenseKey(type: LicenseType = 'monthly'): string {
 }
 
 // Validate license key
-export function validateLicenseKey(key: string): { valid: boolean; type?: LicenseType; deviceHash?: string } {
+export function validateLicenseKey(key: string): { 
+  valid: boolean; 
+  type?: LicenseType; 
+  deviceHash?: string 
+} {
   const parts = key.trim().toUpperCase().split('-');
+  
   if (parts.length !== 4 || parts[0] !== 'MAMA') {
     return { valid: false };
   }
@@ -77,13 +78,12 @@ export function validateLicenseKey(key: string): { valid: boolean; type?: Licens
   
   const type: LicenseType = typeCode === 'M' ? 'monthly' : 'yearly';
   const randomPart = typePart.substring(1);
-  const deviceHash = devicePart.padEnd(8, '0');
   
-  // Verify checksum
-  const raw = `${deviceHash}${typeCode}${randomPart}`;
+  // Reconstruct checksum untuk validasi
+  const rawForChecksum = `${devicePart.padEnd(8, '0')}${typeCode}${randomPart}`;
   let checksum = 0;
-  for (let i = 0; i < raw.length; i++) {
-    checksum += raw.charCodeAt(i);
+  for (let i = 0; i < rawForChecksum.length; i++) {
+    checksum += rawForChecksum.charCodeAt(i);
   }
   const expectedChecksum = (checksum % 1000).toString().padStart(3, '0');
   
@@ -91,7 +91,7 @@ export function validateLicenseKey(key: string): { valid: boolean; type?: Licens
     return { valid: false };
   }
   
-  return { valid: true, type, deviceHash };
+  return { valid: true, type, deviceHash: devicePart };
 }
 
 // Get install date (first time app opened)
@@ -100,6 +100,7 @@ export function getInstallDate(): Date {
   if (saved) {
     return new Date(saved);
   }
+  
   const now = new Date();
   localStorage.setItem(INSTALL_DATE_KEY, now.toISOString());
   return now;
@@ -109,6 +110,7 @@ export function getInstallDate(): Date {
 export function getLicense(): LicenseData | null {
   const saved = localStorage.getItem(LICENSE_DB_KEY);
   if (!saved) return null;
+  
   try {
     return JSON.parse(saved);
   } catch {
@@ -161,16 +163,26 @@ export function checkLicenseStatus(): {
 }
 
 // Activate license
-export function activateLicense(key: string): { success: boolean; message: string; license?: LicenseData } {
+export function activateLicense(key: string): { 
+  success: boolean; 
+  message: string; 
+  license?: LicenseData 
+} {
   const validation = validateLicenseKey(key);
   
   if (!validation.valid) {
     return { success: false, message: 'Kode lisensi tidak valid!' };
   }
   
-  const deviceHash = getDeviceHash();
-  if (validation.deviceHash !== deviceHash.substring(0, 4)) {
-    return { success: false, message: 'Kode lisensi tidak cocok dengan device ini!' };
+  const currentDeviceHash = getDeviceHash();
+  const currentDevicePart = currentDeviceHash.substring(0, 4);
+  
+  // Bandingkan 4 karakter pertama
+  if (validation.deviceHash !== currentDevicePart) {
+    return { 
+      success: false, 
+      message: 'Kode lisensi tidak cocok dengan device ini!\n\nPastikan device hash yang dimasukkan sesuai dengan device ini.' 
+    };
   }
   
   const now = new Date();
@@ -185,7 +197,7 @@ export function activateLicense(key: string): { success: boolean; message: strin
   const license: LicenseData = {
     key: key.toUpperCase(),
     type: validation.type!,
-    deviceHash,
+    deviceHash: currentDeviceHash,
     activatedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     status: 'active'
@@ -193,9 +205,9 @@ export function activateLicense(key: string): { success: boolean; message: strin
   
   saveLicense(license);
   
-  return { 
-    success: true, 
-    message: `Lisensi ${validation.type === 'monthly' ? 'Bulanan' : 'Tahunan'} berhasil diaktifkan!`,
+  return {
+    success: true,
+    message: `Lisensi ${validation.type === 'monthly' ? 'Bulanan' : 'Tahunan'} berhasil diaktifkan!\nBerlaku sampai: ${expiresAt.toLocaleDateString('id-ID')}`,
     license
   };
 }
@@ -207,35 +219,4 @@ export function formatDate(dateStr: string): string {
     month: 'long',
     year: 'numeric'
   });
-}
-
-// Generate kode untuk admin (bisa dipanggil dari console browser)
-export function generateKeyForCustomer(type: LicenseType = 'monthly'): string {
-  // Untuk admin: generate kode dengan device hash customer
-  // Customer harus kasih device hash mereka (dari halaman About/Settings)
-  const typeCode = type === 'monthly' ? 'M' : 'Y';
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  
-  // Admin perlu input device hash customer
-  const deviceHash = prompt('Masukkan Device Hash customer:');
-  if (!deviceHash || deviceHash.length < 4) {
-    alert('Device hash tidak valid!');
-    return '';
-  }
-  
-  const raw = `${deviceHash.padEnd(8, '0')}${typeCode}${random}`;
-  let checksum = 0;
-  for (let i = 0; i < raw.length; i++) {
-    checksum += raw.charCodeAt(i);
-  }
-  const checksumStr = (checksum % 1000).toString().padStart(3, '0');
-  
-  const key = `MAMA-${deviceHash.substring(0, 4)}-${typeCode}${random}-${checksumStr}`;
-  
-  // Copy ke clipboard
-  navigator.clipboard.writeText(key).then(() => {
-    alert(`Kode berhasil di-generate dan disalin ke clipboard:\n\n${key}\n\nTipe: ${type === 'monthly' ? 'Bulanan (Rp 50.000)' : 'Tahunan (Rp 500.000)'}`);
-  });
-  
-  return key;
 }

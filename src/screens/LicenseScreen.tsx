@@ -19,7 +19,6 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
   const [status, setStatus] = useState<LicenseStatus>('trial');
   const [daysRemaining, setDaysRemaining] = useState(0);
-  
   const [deviceHash, setDeviceHash] = useState('');
   const [showHash, setShowHash] = useState(false);
 
@@ -51,6 +50,16 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
   const handleResetTrial = () => {
     if (confirm('Reset trial? Ini hanya untuk testing!')) {
       clearLicense();
+      window.location.reload();
+    }
+  };
+
+  const handleSimulateExpired = () => {
+    if (confirm('Simulasi trial habis (10 hari lalu)?')) {
+      const oldDate = new Date();
+      oldDate.setDate(oldDate.getDate() - 10);
+      localStorage.setItem('mamabee_install_date', oldDate.toISOString());
+      localStorage.removeItem('mamabee_license');
       window.location.reload();
     }
   };
@@ -163,7 +172,7 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
                   cursor: 'pointer'
                 }}
               >
-                📋 Copy Device Hash
+                 Copy Device Hash
               </button>
             </div>
           ) : (
@@ -182,7 +191,7 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
                 marginBottom: '10px'
               }}
             >
-              👁️ Tampilkan Device Hash
+              ️ Tampilkan Device Hash
             </button>
           )}
 
@@ -256,6 +265,25 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
           }}
         >
           ✅ Aktifkan Lisensi
+        </button>
+
+        {/* Simulate Expired Button (Testing) */}
+        <button
+          onClick={handleSimulateExpired}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: '#f44336',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            marginBottom: '10px'
+          }}
+        >
+          ️ Simulasi Trial Habis (Test)
         </button>
 
         {/* Reset Trial Button (Debug) */}
