@@ -12,6 +12,7 @@ import RiwayatScreen from './screens/RiwayatScreen';
 import LaporanScreen from './screens/LaporanScreen';
 import AdminScreen from './screens/AdminScreen';
 import LicenseScreen from './screens/LicenseScreen';
+import VoiceScreen from './screens/VoiceScreen';
 import { checkLicenseStatus } from './utils/licenseManager';
 
 function MainApp() {
@@ -107,7 +108,7 @@ function MainApp() {
         {currentMenu === 'laporan' && <LaporanScreen />}
         {currentMenu === 'admin' && <AdminScreen />}
         {currentMenu === 'license' && <LicenseScreen onActivated={() => setCurrentMenu('dashboard')} />}
-        {currentMenu === 'voice' && <div style={{ padding: '20px', color: text, textAlign: 'center' }}>🎙️ Voice AI (Coming Soon)</div>}
+        {currentMenu === 'voice' && <VoiceScreen onGoKasir={() => setCurrentMenu('kasir')} />}
       </main>
     </div>
   );

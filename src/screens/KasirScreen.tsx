@@ -31,6 +31,34 @@ export function KasirScreen() {
   const loadProducts = async () => {
     const data = await ProductRepo.getAll();
     setProducts(data);
+    // Barang dari Voice AI
+    try {
+      const raw = localStorage.getItem('mamabee_voice_cart');
+      if (raw) {
+        localStorage.removeItem('mamabee_voice_cart');
+        const wanted: Array<{ productId: number; qty: number }> = JSON.parse(raw);
+        const items: CartItem[] = [];
+        for (const w of wanted) {
+          const p = data.find(x => x.id === w.productId);
+          if (p && p.stock > 0) {
+            items.push({ productId: p.id!, name: p.name, price: p.price, qty: Math.min(w.qty, p.stock), stock: p.stock, image: p.image });
+          }
+        }
+        if (items.length) {
+          setCart(prev => {
+            const next = prev.map(c => ({ ...c }));
+            for (const it of items) {
+              const e = next.find(c => c.productId === it.productId);
+              if (e) e.qty = Math.min(e.qty + it.qty, it.stock);
+              else next.push(it);
+            }
+            return next;
+          });
+        }
+      }
+    } catch {
+      // abaikan
+    }
   };
 
   const allCategories = Array.from(new Set(products.map(p => p.category).filter(c => c)));
