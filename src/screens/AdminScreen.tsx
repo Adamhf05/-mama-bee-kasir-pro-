@@ -8,6 +8,8 @@ export default function AdminScreen() {
   const [copied, setCopied] = useState(false);
 
   const generateKey = () => {
+    alert('Kode lisensi kini dibuat lewat Termux:\nnode ~/mamabee-keys/keygen.mjs HASH bulanan|tahunan');
+    return;
     if (!deviceHash.trim() || deviceHash.length < 4) {
       alert('Device hash tidak valid! Minimal 4 karakter.');
       return;

@@ -29,14 +29,14 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
     setDeviceHash(getDeviceHash());
   }, []);
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     if (!licenseKey.trim()) {
       setMessage('Masukkan kode lisensi terlebih dahulu!');
       setMessageType('error');
       return;
     }
 
-    const result = activateLicense(licenseKey);
+    const result = await activateLicense(licenseKey);
     setMessage(result.message);
     setMessageType(result.success ? 'success' : 'error');
 
@@ -215,7 +215,7 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
           <input
             type="text"
             value={licenseKey}
-            onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
+            onChange={(e) => setLicenseKey(e.target.value)}
             placeholder="MAMA-XXXX-XXXX-XXX"
             style={{
               width: '100%',
