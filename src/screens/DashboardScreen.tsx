@@ -251,7 +251,7 @@ export default function DashboardScreen() {
                Tambah produk di menu <strong>Produk</strong>
             </div>
             <div style={{ padding: '12px', background: '#E8F5E9', borderRadius: '8px', fontSize: '13px', color: '#2E7D32' }}>
-              🏪 Tambah toko di menu <strong>Toko</strong>
+              🏪 Tambah toko di menu <strong>Map Market</strong>
             </div>
             <div style={{ padding: '12px', background: '#FFF3E0', borderRadius: '8px', fontSize: '13px', color: '#E65100' }}>
               🛒 Mulai transaksi di menu <strong>Kasir</strong>
