@@ -22,6 +22,7 @@ export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarP
     { id: 'riwayat', label: 'Riwayat', icon: '' },
     { id: 'laporan', label: 'Laporan', icon: '📊' },
     { id: 'voice', label: 'Voice AI', icon: '🎙️' },
+    { id: 'license', label: 'Lisensi', icon: '🔑' },
   ];
 
   const handleLogoClick = () => {

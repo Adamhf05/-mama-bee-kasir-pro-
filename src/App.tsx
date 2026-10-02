@@ -106,6 +106,7 @@ function MainApp() {
         {currentMenu === 'riwayat' && <RiwayatScreen />}
         {currentMenu === 'laporan' && <LaporanScreen />}
         {currentMenu === 'admin' && <AdminScreen />}
+        {currentMenu === 'license' && <LicenseScreen onActivated={() => setCurrentMenu('dashboard')} />}
         {currentMenu === 'voice' && <div style={{ padding: '20px', color: text, textAlign: 'center' }}>🎙️ Voice AI (Coming Soon)</div>}
       </main>
     </div>
