@@ -312,11 +312,11 @@ export function ProdukScreen() {
             </Field>
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button onClick={closeForm} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: `1px solid ${border}`, background: card, color: text, cursor: 'pointer', fontSize: '16px' }}>
-                Batal
-              </button>
               <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#4CAF50', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>
                 {saving ? 'Menyimpan...' : '💾 Simpan'}
+              </button>
+        <button onClick={closeForm} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: `1px solid ${border}`, background: card, color: text, cursor: 'pointer', fontSize: '16px' }}>
+                Batal
               </button>
             </div>
           </div>

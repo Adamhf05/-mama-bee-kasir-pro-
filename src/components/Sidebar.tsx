@@ -78,7 +78,7 @@ export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarP
           }}
         >
           <h2 style={{ margin: 0, color: text, fontSize: '20px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><AppLogo size={36} />Mama Bee Kasir</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><AppLogo size={48} />Mama Bee Kasir</span>
           </h2>
           <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '12px' }}>
             Pro v1.0.0

@@ -1,284 +1,254 @@
-import { AppLogo } from '../components/AppLogo';
 import { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { AppLogo } from '../components/AppLogo';
+import { APP_NAME, BRAND } from '../constants';
 import { ProductRepo } from '../data/repositories/ProductRepo';
+import { TransactionRepo } from '../data/repositories/TransactionRepo';
 import { KunjunganRepo } from '../data/repositories/KunjunganRepo';
-import type { KunjunganRecord } from '../data/database';
+import type { Product } from '../data/database';
+
+interface RecentItem {
+  key: string;
+  type: 'KASIR' | 'TOKO';
+  label: string;
+  total: number;
+  date: Date;
+}
+
+interface Stats {
+  omzet: number;
+  profit: number;
+  trxKasir: number;
+  kunjungan: number;
+  totalProduk: number;
+  lowStock: Product[];
+  top: Array<{ name: string; qty: number }>;
+  recent: RecentItem[];
+  empty: boolean;
+}
+
+const rupiah = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+
+function toDate(v: unknown): Date | null {
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+const sameDay = (d: Date | null, ref: Date) => !!d && d.toDateString() === ref.toDateString();
+
+async function computeStats(): Promise<Stats> {
+  const [products, trans, kunj] = await Promise.all([
+    ProductRepo.getAll(),
+    TransactionRepo.getAll(),
+    KunjunganRepo.getAll()
+  ]);
+  const hpp = new Map<number, number>(
+    products.map(p => [p.id as number, p.hpp || 0] as [number, number])
+  );
+  const now = new Date();
+  let omzet = 0;
+  let profit = 0;
+  let trxKasir = 0;
+  let kunjungan = 0;
+  const qtyByName = new Map<string, number>();
+  const recent: RecentItem[] = [];
+
+  for (const t of trans) {
+    const d = toDate(t.createdAt);
+    for (const it of t.items) {
+      qtyByName.set(it.name, (qtyByName.get(it.name) ?? 0) + it.qty);
+    }
+    if (d) recent.push({ key: 'K' + t.id, type: 'KASIR', label: t.invoice, total: t.total, date: d });
+    if (sameDay(d, now)) {
+      trxKasir++;
+      omzet += t.total;
+      for (const it of t.items) {
+        profit += (it.price - (hpp.get(it.productId) ?? 0)) * it.qty;
+      }
+    }
+  }
+
+  for (const k of kunj) {
+    const d = toDate(k.createdAt);
+    for (const it of k.items) {
+      qtyByName.set(it.namaProduk, (qtyByName.get(it.namaProduk) ?? 0) + it.jumlah);
+    }
+    if (d) recent.push({ key: 'T' + k.id, type: 'TOKO', label: k.idToko, total: k.total, date: d });
+    if (sameDay(d, now)) {
+      kunjungan++;
+      omzet += k.total;
+      for (const it of k.items) {
+        profit += (it.hargaSatuan - (hpp.get(it.produkId) ?? 0)) * it.jumlah;
+      }
+    }
+  }
+
+  recent.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const top = Array.from(qtyByName.entries())
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 3);
+  const lowStock = products.filter(p => p.stock < 5).sort((a, b) => a.stock - b.stock);
+
+  return {
+    omzet,
+    profit,
+    trxKasir,
+    kunjungan,
+    totalProduk: products.length,
+    lowStock,
+    top,
+    recent: recent.slice(0, 5),
+    empty: products.length === 0 && trans.length === 0 && kunj.length === 0
+  };
+}
 
 export default function DashboardScreen() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    penjualanHariIni: 0,
-    totalProduk: 0,
-    transaksiHariIni: 0,
-    profitHariIni: 0,
-    stokMenipis: 0,
-    topProduk: [] as { nama: string; qty: number }[],
-    transaksiTerbaru: [] as KunjunganRecord[]
-  });
+  const { card, text, textMuted, border, dark } = useTheme();
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const load = async () => {
     try {
-      setLoading(true);
-      
-      const [produkList, kunjunganList] = await Promise.all([
-        ProductRepo.getAll(),
-        KunjunganRepo.getAll()
-      ]);
-
-      const today = new Date().toDateString();
-
-      // Filter transaksi hari ini
-      const transaksiHariIni = kunjunganList.filter(k => {
-        const tanggal = new Date(k.createdAt || k.tanggal);
-        return tanggal.toDateString() === today;
-      });
-
-      // Hitung penjualan hari ini
-      const penjualanHariIni = transaksiHariIni.reduce((sum, k) => sum + k.total, 0);
-
-      // Hitung stok menipis (stok < 10)
-      const stokMenipis = produkList.filter(p => p.stock < 10).length;
-
-      // 🟢 HITUNG PROFIT REAL (Harga Jual - Modal) x Qty
-      let profitHariIni = 0;
-      transaksiHariIni.forEach(k => {
-        k.items.forEach(item => {
-          // Cari produk berdasarkan ID untuk ambil data Modal
-          const produk = produkList.find(p => p.id === item.produkId);
-          const modal = produk?.hpp || 0; // Pastikan field di database bernama 'modal'
-          
-          // Rumus: (Harga Jual - Modal) x Jumlah
-          const keuntungan = (item.hargaSatuan - modal) * item.jumlah;
-          profitHariIni += keuntungan;
-        });
-      });
-
-      // Top produk (dari semua transaksi)
-      const produkMap: Record<number, { nama: string; qty: number }> = {};
-      kunjunganList.forEach(k => {
-        k.items.forEach(item => {
-          if (!produkMap[item.produkId]) {
-            produkMap[item.produkId] = { nama: item.namaProduk, qty: 0 };
-          }
-          produkMap[item.produkId].qty += item.jumlah;
-        });
-      });
-      const topProduk = Object.values(produkMap)
-        .sort((a, b) => b.qty - a.qty)
-        .slice(0, 3);
-
-      // 5 transaksi terbaru
-      const transaksiTerbaru = [...kunjunganList]
-        .sort((a, b) => new Date(b.createdAt || b.tanggal).getTime() - new Date(a.createdAt || a.tanggal).getTime())
-        .slice(0, 5);
-
-      setStats({
-        penjualanHariIni,
-        totalProduk: produkList.length,
-        transaksiHariIni: transaksiHariIni.length,
-        profitHariIni, // Sekarang Profit Real!
-        stokMenipis,
-        topProduk,
-        transaksiTerbaru
-      });
-
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-    } finally {
-      setLoading(false);
+      setError('');
+      setStats(await computeStats());
+    } catch (e) {
+      setError('Gagal memuat dashboard: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
 
-  const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID');
+  useEffect(() => {
+    load();
+  }, []);
 
-  if (loading) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
+  const box = {
+    background: card,
+    borderRadius: '12px',
+    padding: '16px',
+    marginBottom: '16px',
+    border: `1px solid ${border}`
+  } as const;
+
+  const today = new Date().toLocaleDateString('id-ID', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
+  const cards = stats
+    ? [
+        { icon: '💰', label: 'Omzet Hari Ini', value: rupiah(stats.omzet), sub: 'Kasir + Toko', bg: 'linear-gradient(135deg,#1976D2,#42A5F5)' },
+        { icon: '📈', label: 'Profit Hari Ini', value: rupiah(stats.profit), sub: '(Harga jual − HPP) × qty', bg: `linear-gradient(135deg,${BRAND.purple},#BA68C8)` },
+        { icon: '🧾', label: 'Transaksi Kasir', value: String(stats.trxKasir), sub: 'hari ini', bg: 'linear-gradient(135deg,#FB8C00,#FFB74D)' },
+        { icon: '🏪', label: 'Kunjungan Toko', value: String(stats.kunjungan), sub: 'hari ini', bg: 'linear-gradient(135deg,#43A047,#81C784)' }
+      ]
+    : [];
+
+  const medal = ['#FFC107', '#B0BEC5', '#CD7F32'];
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px' }}>
-      <h2 style={{ marginBottom: '20px', color: '#1976D2', textAlign: 'center' }}>
-        🏠 Dashboard
-      </h2>
-
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '25px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #1976D2, #42A5F5)', padding: '20px', borderRadius: '12px', color: 'white', boxShadow: '0 4px 12px rgba(25,118,210,0.3)' }}>
-          <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '8px' }}>💰 Penjualan Hari Ini</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{formatRupiah(stats.penjualanHariIni)}</div>
-        </div>
-
-        <div style={{ background: 'linear-gradient(135deg, #4CAF50, #81C784)', padding: '20px', borderRadius: '12px', color: 'white', boxShadow: '0 4px 12px rgba(76,175,80,0.3)' }}>
-          <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '8px' }}>📦 Total Produk</div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{stats.totalProduk}</div>
-        </div>
-
-        <div style={{ background: 'linear-gradient(135deg, #FF9800, #FFB74D)', padding: '20px', borderRadius: '12px', color: 'white', boxShadow: '0 4px 12px rgba(255,152,0,0.3)' }}>
-          <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '8px' }}>🧾 Transaksi Hari Ini</div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{stats.transaksiHariIni}</div>
-        </div>
-
-        <div style={{ background: 'linear-gradient(135deg, #9C27B0, #BA68C8)', padding: '20px', borderRadius: '12px', color: 'white', boxShadow: '0 4px 12px rgba(156,39,176,0.3)' }}>
-          <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '8px' }}> Profit Hari Ini</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{formatRupiah(stats.profitHariIni)}</div>
-          <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '5px' }}>Keuntungan Bersih Real</div>
-        </div>
-      </div>
-
-      {/* Stok Menipis Warning */}
-      {stats.stokMenipis > 0 && (
-        <div style={{ 
-          background: '#FFEBEE', 
-          padding: '15px', 
-          borderRadius: '12px', 
-          marginBottom: '20px',
-          border: '2px solid #f44336',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}>
-          <div style={{ fontSize: '24px' }}>⚠️</div>
-          <div>
-            <div style={{ fontWeight: 'bold', color: '#c62828', fontSize: '14px' }}>
-              {stats.stokMenipis} Produk Stok Menipis!
-            </div>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '3px' }}>
-              Segera restock untuk menghindari kehabisan
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top Produk */}
-      {stats.topProduk.length > 0 && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #ddd' }}>
-          <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#333' }}>
-            🏆 Top 3 Produk Terlaris
-          </h3>
-          {stats.topProduk.map((p, idx) => (
-            <div key={idx} style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              padding: '12px',
-              marginBottom: '8px',
-              background: idx === 0 ? '#FFF9C4' : idx === 1 ? '#F5F5F5' : '#FFF3E0',
-              borderRadius: '8px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ 
-                  width: '30px', 
-                  height: '30px', 
-                  borderRadius: '50%', 
-                  background: idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  color: 'white'
-                }}>
-                  {idx + 1}
-                </div>
-                <strong style={{ fontSize: '14px' }}>{p.nama}</strong>
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1976D2' }}>
-                {p.qty} pcs
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Transaksi Terbaru */}
-      {stats.transaksiTerbaru.length > 0 && (
-        <div style={{ background: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #ddd' }}>
-          <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#333' }}>
-            🕐 Transaksi Terbaru
-          </h3>
-          {stats.transaksiTerbaru.map((k, idx) => (
-            <div key={idx} style={{ 
-              padding: '12px',
-              marginBottom: '8px',
-              background: '#f5f5f5',
-              borderRadius: '8px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>
-                  {k.idToko}
-                </div>
-                <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
-                  {new Date(k.createdAt || k.tanggal).toLocaleString('id-ID')}
-                </div>
-              </div>
-              <div style={{ 
-                fontSize: '14px', 
-                fontWeight: 'bold', 
-                color: k.tipe === 'Cash' ? '#4CAF50' : '#FF9800'
-              }}>
-                {formatRupiah(k.total)}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {stats.totalProduk === 0 && stats.transaksiHariIni === 0 && (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '40px 20px',
-          background: 'white',
-          borderRadius: '12px',
-          border: '1px solid #ddd'
-        }}>
-          <div style={{ marginBottom: '20px' }}><AppLogo size={96} /></div>
-          <h3 style={{ color: '#333', marginBottom: '10px' }}>Selamat Datang di Mama Bee Kasir Pro!</h3>
-          <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
-            Mulai dengan menambahkan produk dan melakukan transaksi pertama Anda
-          </p>
-          <div style={{ display: 'grid', gap: '10px', maxWidth: '300px', margin: '0 auto' }}>
-            <div style={{ padding: '12px', background: '#E3F2FD', borderRadius: '8px', fontSize: '13px', color: '#1976D2' }}>
-               Tambah produk di menu <strong>Produk</strong>
-            </div>
-            <div style={{ padding: '12px', background: '#E8F5E9', borderRadius: '8px', fontSize: '13px', color: '#2E7D32' }}>
-              🏪 Tambah toko di menu <strong>Map Market</strong>
-            </div>
-            <div style={{ padding: '12px', background: '#FFF3E0', borderRadius: '8px', fontSize: '13px', color: '#E65100' }}>
-              🛒 Mulai transaksi di menu <strong>Kasir</strong>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Refresh Button */}
-      <button
-        onClick={loadDashboardData}
+    <div style={{ padding: '16px', paddingBottom: '100px', maxWidth: '700px', margin: '0 auto' }}>
+      <div
         style={{
-          width: '100%',
-          padding: '12px',
-          background: '#1976D2',
+          background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.black})`,
+          borderRadius: '16px',
+          padding: '24px 16px',
+          textAlign: 'center',
           color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          marginBottom: '20px'
+          marginBottom: '16px',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
         }}
       >
-        🔄 Refresh Dashboard
-      </button>
+        <AppLogo size={120} style={{ boxShadow: `0 0 0 4px ${BRAND.yellow}, 0 4px 12px rgba(0,0,0,0.4)` }} />
+        <h1 style={{ margin: '14px 0 4px', fontSize: '22px' }}>{APP_NAME}</h1>
+        <div style={{ opacity: 0.85, fontSize: '13px' }}>{today}</div>
+      </div>
+
+      {error && (
+        <div style={{ ...box, color: '#f44336' }}>{error}</div>
+      )}
+      {!stats && !error && (
+        <div style={{ textAlign: 'center', color: textMuted, padding: '30px 0' }}>Memuat data...</div>
+      )}
+
+      {stats && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+            {cards.map(c => (
+              <div key={c.label} style={{ background: c.bg, borderRadius: '14px', padding: '16px 10px', color: 'white', textAlign: 'center', boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                <div style={{ fontSize: '13px', opacity: 0.95 }}>{c.icon} {c.label}</div>
+                <div style={{ fontSize: '22px', fontWeight: 'bold', margin: '8px 0 4px' }}>{c.value}</div>
+                <div style={{ fontSize: '11px', opacity: 0.85 }}>{c.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', color: textMuted, fontSize: '13px', marginBottom: '16px' }}>
+            📦 {stats.totalProduk} produk terdaftar
+          </div>
+
+          {stats.empty && (
+            <div style={{ ...box, textAlign: 'center' }}>
+              <h2 style={{ color: text, marginTop: 0 }}>Selamat Datang!</h2>
+              <p style={{ color: textMuted }}>Mulai dengan menambahkan produk di menu Produk, lalu lakukan transaksi pertama di menu Kasir.</p>
+            </div>
+          )}
+
+          {stats.lowStock.length > 0 && (
+            <div style={{ ...box, borderColor: '#f44336', background: dark ? '#3b2224' : '#FFEBEE' }}>
+              <div style={{ color: '#f44336', fontWeight: 'bold', marginBottom: '8px' }}>
+                ⚠️ {stats.lowStock.length} produk stok menipis (di bawah 5)
+              </div>
+              {stats.lowStock.slice(0, 5).map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', color: text, padding: '4px 0' }}>
+                  <span>{p.name}</span>
+                  <b>{p.stock} {p.unit || 'Pcs'}</b>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stats.top.length > 0 && (
+            <div style={box}>
+              <div style={{ color: text, fontWeight: 'bold', marginBottom: '10px' }}>🏆 Top 3 Produk Terlaris</div>
+              {stats.top.map((t, i) => (
+                <div key={t.name} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderTop: i ? `1px solid ${border}` : 'none' }}>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: medal[i], color: '#222', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</div>
+                  <div style={{ flex: 1, color: text, fontWeight: 'bold' }}>{t.name}</div>
+                  <div style={{ color: '#1976D2', fontWeight: 'bold' }}>{t.qty} pcs</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stats.recent.length > 0 && (
+            <div style={box}>
+              <div style={{ color: text, fontWeight: 'bold', marginBottom: '10px' }}>🕐 Transaksi Terbaru</div>
+              {stats.recent.map((r, i) => (
+                <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: i ? `1px solid ${border}` : 'none' }}>
+                  <span style={{ background: r.type === 'KASIR' ? '#1976D2' : '#43A047', color: 'white', fontSize: '11px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '10px' }}>
+                    {r.type}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: text, fontWeight: 'bold', fontSize: '14px' }}>{r.label}</div>
+                    <div style={{ color: textMuted, fontSize: '12px' }}>{r.date.toLocaleString('id-ID')}</div>
+                  </div>
+                  <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>{rupiah(r.total)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={load}
+            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: '#1976D2', color: 'white', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+          >
+            🔄 Refresh Dashboard
+          </button>
+        </>
+      )}
     </div>
   );
 }
