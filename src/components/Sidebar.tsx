@@ -1,3 +1,4 @@
+import { AppLogo } from './AppLogo';
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -9,17 +10,18 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarProps) {
-  const { text, card } = useTheme();
+  const { text, card, dark, toggle } = useTheme();
   const [logoClicks, setLogoClicks] = useState(0);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
     { id: 'kasir', label: 'Kasir', icon: '🛒' },
     { id: 'produk', label: 'Produk', icon: '📦' },
-    { id: 'toko', label: 'Toko', icon: '' },
-    { id: 'pelanggan', label: 'Pelanggan', icon: '' },
+    { id: 'katalog', label: 'Katalog', icon: '🛍️' },
+    { id: 'toko', label: 'Toko', icon: '🏪' },
+    { id: 'pelanggan', label: 'Pelanggan', icon: '👥' },
     { id: 'mapmarket', label: 'Map Market', icon: '🗺️' },
-    { id: 'riwayat', label: 'Riwayat', icon: '' },
+    { id: 'riwayat', label: 'Riwayat', icon: '🕒' },
     { id: 'laporan', label: 'Laporan', icon: '📊' },
     { id: 'voice', label: 'Voice AI', icon: '🎙️' },
     { id: 'license', label: 'Lisensi', icon: '🔑' },
@@ -76,7 +78,7 @@ export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarP
           }}
         >
           <h2 style={{ margin: 0, color: text, fontSize: '20px' }}>
-            🐝 Mama Bee Kasir
+            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><AppLogo size={36} />Mama Bee Kasir</span>
           </h2>
           <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '12px' }}>
             Pro v1.0.0
@@ -115,16 +117,7 @@ export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarP
 
         <div style={{ padding: '20px', borderTop: '1px solid #ddd' }}>
           <button
-            onClick={() => {
-              const html = document.documentElement;
-              if (html.getAttribute('data-theme') === 'dark') {
-                html.removeAttribute('data-theme');
-                localStorage.setItem('theme', 'light');
-              } else {
-                html.setAttribute('data-theme', 'dark');
-                localStorage.setItem('theme', 'dark');
-              }
-            }}
+            onClick={toggle}
             style={{
               width: '100%',
               padding: '12px',
@@ -136,7 +129,7 @@ export function Sidebar({ currentMenu, onMenuChange, isOpen, onClose }: SidebarP
               marginBottom: '10px'
             }}
           >
-            🌙 Dark Mode
+            {dark ? '☀️ Mode Terang' : '🌙 Dark Mode'}
           </button>
           <button
             onClick={() => {

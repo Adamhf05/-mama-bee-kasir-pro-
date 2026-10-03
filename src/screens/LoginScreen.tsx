@@ -1,3 +1,4 @@
+import { AppLogo } from '../components/AppLogo';
 import { useState } from 'react';
 
 interface LoginScreenProps {
@@ -36,7 +37,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
       }}>
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{ fontSize: '60px', marginBottom: '10px' }}>🐝</div>
+          <div style={{ marginBottom: '10px' }}><AppLogo size={90} /></div>
           <h1 style={{ margin: 0, color: '#1976D2', fontSize: '24px' }}>Mama Bee Kasir Pro</h1>
           <p style={{ margin: '10px 0 0', color: '#666', fontSize: '14px' }}>Masukkan PIN untuk masuk</p>
         </div>

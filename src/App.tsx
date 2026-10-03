@@ -1,9 +1,11 @@
+import { AppLogo } from './components/AppLogo';
 import { useState, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { Sidebar } from './components/Sidebar';
 import { LoginScreen } from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import { ProdukScreen } from './screens/ProdukScreen';
+import { KatalogScreen } from './screens/KatalogScreen';
 import { KasirScreen } from './screens/KasirScreen';
 import TokoScreen from './screens/TokoScreen';
 import PelangganScreen from './screens/PelangganScreen';
@@ -21,7 +23,7 @@ function MainApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [licenseValid, setLicenseValid] = useState(false);
   const [licenseChecked, setLicenseChecked] = useState(false);
-  const { bg, text } = useTheme();
+  const { bg, text, card, border } = useTheme();
 
   useEffect(() => {
     const saved = localStorage.getItem('isLoggedIn');
@@ -44,7 +46,7 @@ function MainApp() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '60px', marginBottom: '20px' }}>🐝</div>
+          <div style={{ marginBottom: '20px' }}><AppLogo size={90} /></div>
           <p style={{ color: '#666' }}>Memverifikasi lisensi...</p>
         </div>
       </div>
@@ -75,8 +77,8 @@ function MainApp() {
         left: 0,
         right: 0,
         height: '60px',
-        background: 'white',
-        borderBottom: '1px solid #ddd',
+        background: card,
+        borderBottom: `1px solid ${border}`,
         display: 'flex',
         alignItems: 'center',
         padding: '0 20px',
@@ -88,6 +90,7 @@ function MainApp() {
             background: 'none',
             border: 'none',
             fontSize: '24px',
+            color: text,
             cursor: 'pointer',
             marginRight: '15px'
           }}
@@ -101,6 +104,7 @@ function MainApp() {
         {currentMenu === 'dashboard' && <DashboardScreen />}
         {currentMenu === 'kasir' && <KasirScreen />}
         {currentMenu === 'produk' && <ProdukScreen />}
+        {currentMenu === 'katalog' && <KatalogScreen />}
         {currentMenu === 'toko' && <TokoScreen />}
         {currentMenu === 'pelanggan' && <PelangganScreen />}
         {currentMenu === 'mapmarket' && <MapMarketScreen />}

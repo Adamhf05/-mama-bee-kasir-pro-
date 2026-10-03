@@ -1,3 +1,4 @@
+import { AppLogo } from '../components/AppLogo';
 import { useState, useEffect } from 'react';
 import { ProductRepo } from '../data/repositories/ProductRepo';
 import { KunjunganRepo } from '../data/repositories/KunjunganRepo';
@@ -241,7 +242,7 @@ export default function DashboardScreen() {
           borderRadius: '12px',
           border: '1px solid #ddd'
         }}>
-          <div style={{ fontSize: '64px', marginBottom: '20px' }}>🐝</div>
+          <div style={{ marginBottom: '20px' }}><AppLogo size={96} /></div>
           <h3 style={{ color: '#333', marginBottom: '10px' }}>Selamat Datang di Mama Bee Kasir Pro!</h3>
           <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
             Mulai dengan menambahkan produk dan melakukan transaksi pertama Anda

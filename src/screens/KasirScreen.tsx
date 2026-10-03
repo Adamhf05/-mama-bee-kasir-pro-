@@ -138,7 +138,7 @@ export function KasirScreen() {
 
     // Kurangi stok
     for (const item of cart) {
-      await ProductRepo.updateStock(item.productId, -item.qty);
+      await ProductRepo.addStock(item.productId, -item.qty);
     }
 
     setLastTransaction({ ...transaction, id: Date.now() } as Transaction);

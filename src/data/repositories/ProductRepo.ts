@@ -1,3 +1,4 @@
+import { assertValidProduct } from '../../utils/productRules';
 import { db } from '../database';
 import type { Product } from '../database';
 
@@ -21,6 +22,7 @@ export const ProductRepo = {
   },
 
   add: async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> => {
+    assertValidProduct(product);
     return db.products.add({
       ...product,
       createdAt: new Date(),
@@ -42,7 +44,7 @@ export const ProductRepo = {
   //  FIX: Langsung set stock ke nilai yang diberikan (bukan di-add)
   setStock: async (id: number, newStock: number): Promise<void> => {
     await db.products.update(id, {
-      stock: newStock,
+      stock: Math.max(0, Math.round(newStock)),
       updatedAt: new Date()
     });
   },
@@ -52,7 +54,7 @@ export const ProductRepo = {
     const product = await db.products.get(id);
     if (product) {
       await db.products.update(id, {
-        stock: product.stock + qty,
+        stock: Math.max(0, product.stock + qty),
         updatedAt: new Date()
       });
     }
@@ -61,7 +63,7 @@ export const ProductRepo = {
   // Backward compatibility - sekarang langsung set, bukan add
   updateStock: async (id: number, newStock: number): Promise<void> => {
     await db.products.update(id, {
-      stock: newStock,
+      stock: Math.max(0, Math.round(newStock)),
       updatedAt: new Date()
     });
   }

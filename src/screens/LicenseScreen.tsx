@@ -1,3 +1,4 @@
+import { AppLogo } from '../components/AppLogo';
 import { useState, useEffect } from 'react';
 import { 
   checkLicenseStatus, 
@@ -103,7 +104,7 @@ export default function LicenseScreen({ onActivated }: LicenseScreenProps) {
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ fontSize: '60px', marginBottom: '10px' }}>🐝</div>
+          <div style={{ marginBottom: '10px' }}><AppLogo size={90} /></div>
           <h1 style={{ margin: '0 0 5px 0', color: '#333', fontSize: '24px' }}>
             Mama Bee Kasir Pro
           </h1>
