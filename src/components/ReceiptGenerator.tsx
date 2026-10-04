@@ -17,6 +17,8 @@ interface ReceiptData {
   items: ReceiptItem[];
   total: number;
   catatan?: string;
+  uangDiterima?: number;
+  kembalian?: number;
 }
 
 interface ReceiptGeneratorProps {
@@ -98,6 +100,12 @@ export const ReceiptGenerator = forwardRef<HTMLDivElement, ReceiptGeneratorProps
         {/* Total */}
         <div style={{ textAlign: 'right', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
           <p style={{ margin: '2px 0' }}>TOTAL: {formatRupiah(data.total)}</p>
+          {data.tipe === 'Cash' && data.uangDiterima !== undefined && (
+            <>
+              <p style={{ margin: '2px 0', fontSize: '12px', fontWeight: 'normal' }}>Uang Diterima: {formatRupiah(data.uangDiterima)}</p>
+              <p style={{ margin: '2px 0', fontSize: '12px', fontWeight: 'normal' }}>Kembalian: {formatRupiah(data.kembalian ?? 0)}</p>
+            </>
+          )}
         </div>
 
         <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }}></div>

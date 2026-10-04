@@ -27,6 +27,8 @@ interface TransaksiTerakhir {
   tokoAlamat: string;
   tanggal: string;
   tipe: 'Cash' | 'Credit';
+  uangDiterima?: number;
+  kembalian?: number;
   items: ItemRiwayat[];
   total: number;
 }
@@ -42,6 +44,7 @@ export default function TokoScreen() {
   const [produkList, setProdukList] = useState<Product[]>([]);
   const [cart, setCart] = useState<ItemKeranjang[]>([]);
   const [pembayaran, setPembayaran] = useState<'Cash' | 'Credit'>('Cash');
+  const [uangMasuk, setUangMasuk] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [filterHari, setFilterHari] = useState<string>('Semua');
   const [kunjunganStats, setKunjunganStats] = useState<Record<string, {totalCash: number; totalCredit: number; totalKunjungan: number}>>({});
@@ -151,6 +154,13 @@ export default function TokoScreen() {
   };
 
   const handleCheckout = async () => {
+    // Validasi uang diterima (khusus Cash)
+    if (cart.length > 0 && pembayaran === 'Cash' && (!uangMasuk || !(Number(uangMasuk) >= getTotal()))) {
+      alert('⚠️ Uang Kurang!');
+      return;
+    }
+    const uangDiterimaFinal = pembayaran === 'Cash' ? Number(uangMasuk) : undefined;
+    const kembalianFinal = pembayaran === 'Cash' ? Number(uangMasuk) - getTotal() : undefined;
     if (cart.length === 0) {
       alert('⚠️ Keranjang kosong!');
       return;
@@ -197,6 +207,8 @@ export default function TokoScreen() {
         tokoNama: selectedToko!.nama,
         tokoId: selectedToko!.idToko,
         tokoAlamat: selectedToko!.alamat,
+        uangDiterima: uangDiterimaFinal,
+        kembalian: kembalianFinal,
         tanggal: kunjungan.tanggal,
         tipe: pembayaran,
         items: itemsForHistory,
@@ -205,6 +217,7 @@ export default function TokoScreen() {
       
       setShowKasir(false);
       setCart([]);
+      setUangMasuk('');
       setShowReceipt(true); // Tampilkan struk
       
       await loadProduk();
@@ -477,6 +490,26 @@ export default function TokoScreen() {
             <button onClick={() => setPembayaran('Credit')} style={{ flex: 1, padding: '12px', background: pembayaran === 'Credit' ? '#FF9800' : '#f5f5f5', color: pembayaran === 'Credit' ? 'white' : '#333', border: pembayaran === 'Credit' ? '2px solid #E65100' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>💳 Credit</button>
           </div>
         </div>
+
+        {pembayaran === 'Cash' && (
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>💵 Uang Diterima (Rp):</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={uangMasuk}
+              onChange={(e) => setUangMasuk(e.target.value)}
+              placeholder="Contoh: 50000"
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '16px', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', padding: '12px', borderRadius: '8px', background: '#f5f5f5', fontWeight: 'bold' }}>
+              <span>Kembalian:</span>
+              <span style={{ color: uangMasuk !== '' && Number(uangMasuk) < getTotal() ? '#f44336' : '#2E7D32' }}>
+                {uangMasuk === '' ? 'Rp 0' : Number(uangMasuk) < getTotal() ? 'Kurang Rp ' + (getTotal() - Number(uangMasuk)).toLocaleString('id-ID') : 'Rp ' + (Number(uangMasuk) - getTotal()).toLocaleString('id-ID')}
+              </span>
+            </div>
+          </div>
+        )}
 
         <button onClick={handleCheckout} disabled={cart.length === 0 || loading} style={{ width: '100%', padding: '15px', background: (cart.length === 0 || loading) ? '#ccc' : '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', cursor: (cart.length === 0 || loading) ? 'not-allowed' : 'pointer' }}>
           {loading ? '⏳ Memproses...' : '✅ Selesaikan Transaksi'}

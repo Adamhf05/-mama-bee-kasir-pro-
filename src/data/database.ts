@@ -63,6 +63,7 @@ export interface SalesToko {
   folder: string;        // area/wilayah
   hariKunjungan: string[]; // ['Senin', 'Kamis']
   catatan?: string;
+  foto?: string;       // foto toko (data URL)
   createdAt: Date;
   updatedAt: Date;
 }

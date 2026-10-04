@@ -1,3 +1,4 @@
+import { PhotoPicker } from '../components/PhotoPicker';
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Browser } from '@capacitor/browser';
@@ -476,6 +477,12 @@ export default function MapMarketScreen() {
                 </div>
               </div>
 
+              <div style={{ marginBottom: '15px' }}>
+                <PhotoPicker
+                  value={currentToko.foto || ''}
+                  onChange={(v) => setCurrentToko(prev => ({ ...prev, foto: v }))}
+                />
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <button type="submit" style={{ padding: '14px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
                   💾 Simpan
