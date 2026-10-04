@@ -1,3 +1,5 @@
+import { TransactionRepo } from '../data/repositories/TransactionRepo';
+import type { Transaction } from '../data/database';
 import { useState, useEffect } from 'react';
 import { KunjunganRepo } from '../data/repositories/KunjunganRepo';
 import { TokoRepo } from '../data/repositories/TokoRepo';
@@ -33,6 +35,7 @@ export default function LaporanScreen() {
   const [periode, setPeriode] = useState<Periode>('semua');
   const [loading, setLoading] = useState(true);
   const [kunjunganList, setKunjunganList] = useState<KunjunganRecord[]>([]);
+  const [kasirList, setKasirList] = useState<Transaction[]>([]);
   const [tokoList, setTokoList] = useState<SalesToko[]>([]);
   const [produkList, setProdukList] = useState<Product[]>([]);
   
@@ -52,14 +55,16 @@ export default function LaporanScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [kunjungan, toko, produk] = await Promise.all([
+      const [kunjungan, toko, produk, transaksiKasir] = await Promise.all([
         KunjunganRepo.getAll(),
         TokoRepo.getAll(),
-        ProductRepo.getAll()
+        ProductRepo.getAll(),
+        TransactionRepo.getAll()
       ]);
       setKunjunganList(kunjungan);
       setTokoList(toko);
       setProdukList(produk);
+      setKasirList(transaksiKasir);
     } catch (error) {
       console.error('Error loading laporan:', error);
     } finally {
@@ -89,6 +94,46 @@ export default function LaporanScreen() {
   const totalCredit = filteredKunjungan.filter(k => k.tipe === 'Credit').reduce((sum, k) => sum + k.total, 0);
   const rataRata = totalTransaksi > 0 ? totalOmzet / totalTransaksi : 0;
   const tokoUnik = new Set(filteredKunjungan.map(k => k.idToko)).size;
+
+  // Rekapitulasi gabungan Kasir + Toko (mengikuti filter periode)
+  const rekapGabungan = (() => {
+    const inPeriode = (d: Date) => {
+      if (periode === 'semua') return true;
+      const now = new Date();
+      if (periode === 'hari') return d.toDateString() === now.toDateString();
+      if (periode === 'minggu') return d >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (periode === 'bulan') return d >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return true;
+    };
+    const hpp = new Map<number, number>(
+      produkList.map(p => [p.id as number, p.hpp || 0] as [number, number])
+    );
+    const kasir = kasirList.filter(t => inPeriode(new Date(t.createdAt)));
+    const tokoCash = filteredKunjungan.filter(k => k.tipe === 'Cash');
+
+    const kasirOmzet = kasir.reduce((sum, t) => sum + t.total, 0);
+    const kasirProfit = kasir.reduce(
+      (sum, t) => sum + t.items.reduce((s2, it) => s2 + (it.price - (hpp.get(it.productId) ?? 0)) * it.qty, 0),
+      0
+    );
+    const tokoProfit = filteredKunjungan.reduce(
+      (sum, k) => sum + k.items.reduce((s2, it) => s2 + (it.hargaSatuan - (hpp.get(it.produkId) ?? 0)) * it.jumlah, 0),
+      0
+    );
+    const bersihToko = tokoCash.reduce((sum, k) => sum + k.total, 0);
+    const tokoBerData = tokoCash.filter(k => k.uangDiterima !== undefined);
+
+    return {
+      diterima: kasir.reduce((sum, t) => sum + t.payment, 0) + tokoBerData.reduce((sum, k) => sum + (k.uangDiterima ?? 0), 0),
+      kembalian: kasir.reduce((sum, t) => sum + t.change, 0) + tokoBerData.reduce((sum, k) => sum + (k.kembalian ?? 0), 0),
+      bersihKasir: kasirOmzet,
+      bersihToko,
+      bersih: kasirOmzet + bersihToko,
+      tanpaData: tokoCash.length - tokoBerData.length,
+      omzet: kasirOmzet + totalOmzet,
+      profit: kasirProfit + tokoProfit
+    };
+  })();
 
   const tokoStats: Record<string, TokoStat> = {};
   filteredKunjungan.forEach(k => {
@@ -345,6 +390,46 @@ export default function LaporanScreen() {
               {totalOmzet > 0 ? Math.round((totalCredit / totalOmzet) * 100) : 0}% dari total
             </div>
           </div>
+        </div>
+      </div>
+
+      <div style={{ background: 'white', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #ddd' }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>💵 Rekapitulasi Cash (Kasir + Toko)</h3>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ flex: 1, background: '#E8F5E9', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#2E7D32' }}>Uang Diterima</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2E7D32' }}>{formatRupiah(rekapGabungan.diterima)}</div>
+          </div>
+          <div style={{ flex: 1, background: '#FFF3E0', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#E65100' }}>Kembalian</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#E65100' }}>{formatRupiah(rekapGabungan.kembalian)}</div>
+          </div>
+        </div>
+        <div style={{ background: '#E3F2FD', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
+          <div style={{ fontSize: '11px', color: '#1565C0' }}>Uang Cash Bersih di Laci</div>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1565C0' }}>{formatRupiah(rekapGabungan.bersih)}</div>
+          <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>
+            Kasir {formatRupiah(rekapGabungan.bersihKasir)} • Toko {formatRupiah(rekapGabungan.bersihToko)}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          <div style={{ flex: 1, background: '#F3E5F5', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#6A1B9A' }}>Omzet Gabungan</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#6A1B9A' }}>{formatRupiah(rekapGabungan.omzet)}</div>
+          </div>
+          <div style={{ flex: 1, background: '#F3E5F5', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#6A1B9A' }}>Profit Gabungan</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#6A1B9A' }}>{formatRupiah(rekapGabungan.profit)}</div>
+          </div>
+        </div>
+        {rekapGabungan.tanpaData > 0 && (
+          <div style={{ fontSize: '11px', color: '#999', marginTop: '8px' }}>
+            {rekapGabungan.tanpaData} transaksi Toko Cash lama tidak punya data uang diterima, jadi hanya dihitung di Uang Cash Bersih.
+          </div>
+        )}
+        <div style={{ fontSize: '11px', color: '#666', marginTop: '10px', lineHeight: 1.5 }}>
+          Uang Cash Bersih di Laci = Uang Diterima − Kembalian = Omzet Cash.<br />
+          Omzet = Harga Jual × Qty. Profit = (Harga − HPP) × Qty.
         </div>
       </div>
 

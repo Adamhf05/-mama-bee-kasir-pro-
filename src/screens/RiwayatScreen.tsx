@@ -1,3 +1,4 @@
+import { PaymentInfo } from '../components/PaymentInfo';
 import { TransactionRepo } from '../data/repositories/TransactionRepo';
 import { transactionToRecord } from '../utils/paymentUtils';
 import { useState, useEffect, useRef } from 'react';
@@ -251,6 +252,7 @@ export default function RiwayatScreen() {
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>{k.tanggal}</div>
+              <PaymentInfo method={k.tipe} received={k.uangDiterima} change={k.kembalian} compact color="#333" mutedColor="#666" />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '11px', color: '#999' }}>{k.items.length} item</span>
                 <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#2E7D32' }}>{formatRupiah(k.total)}</span>

@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { ReceiptGenerator } from '../components/ReceiptGenerator';
+import { generateReceiptImage, shareReceiptViaWhatsApp, downloadReceiptImage } from '../utils/receiptUtils';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProductRepo } from '../data/repositories/ProductRepo';
 import { TransactionRepo } from '../data/repositories/TransactionRepo';
@@ -147,6 +149,86 @@ export function KasirScreen() {
     setCart([]);
     setPayment(0);
     loadProducts();
+  };
+
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+
+  // Data struk Kasir Utama, bentuknya sama dengan struk Toko
+  const kasirReceiptData = lastTransaction
+    ? {
+        tokoNama: 'Kasir Umum',
+        tokoId: lastTransaction.invoice,
+        tokoAlamat: '-',
+        tanggal: new Date(lastTransaction.createdAt).toLocaleString('id-ID'),
+        tipe: 'Cash' as const,
+        items: lastTransaction.items.map(it => ({
+          namaProduk: it.name,
+          jumlah: it.qty,
+          hargaSatuan: it.price,
+          subtotal: it.price * it.qty
+        })),
+        total: lastTransaction.total,
+        uangDiterima: lastTransaction.payment,
+        kembalian: lastTransaction.change
+      }
+    : null;
+
+  const handleShareReceipt = async () => {
+    if (!receiptRef.current) return;
+    try {
+      setSharing(true);
+      const imageData = await generateReceiptImage(receiptRef.current);
+      await shareReceiptViaWhatsApp(imageData, 'Kasir Umum');
+    } catch (error) {
+      console.error('Share error:', error);
+      alert('❌ Gagal membagikan struk: ' + (error as Error).message);
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleDownloadReceipt = async () => {
+    if (!receiptRef.current) return;
+    try {
+      setSharing(true);
+      const imageData = await generateReceiptImage(receiptRef.current);
+      await downloadReceiptImage(imageData, 'Kasir Umum');
+      alert('✅ Struk berhasil didownload!');
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('❌ Gagal mendownload struk');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handlePrintReceipt = () => {
+    if (!receiptRef.current) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('⚠️ Popup diblokir! Izinkan popup untuk print.');
+      return;
+    }
+    const content = receiptRef.current.innerHTML;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Struk</title>
+          <style>
+            @page { size: 58mm auto; margin: 0; }
+            body { width: 58mm; margin: 0; padding: 5mm; font-family: monospace; font-size: 10px; }
+            * { box-sizing: border-box; }
+            img { max-width: 100%; }
+          </style>
+        </head>
+        <body>${content}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID');
@@ -371,7 +453,7 @@ export function KasirScreen() {
         </div>
       )}
 
-      {showReceipt && lastTransaction && (
+      {showReceipt && lastTransaction && kasirReceiptData && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -380,67 +462,54 @@ export function KasirScreen() {
           bottom: 0,
           background: 'rgba(0,0,0,0.5)',
           zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          overflowY: 'auto',
           padding: '20px'
         }}>
           <div style={{
             background: 'white',
             width: '100%',
-            maxWidth: '400px',
+            maxWidth: '420px',
+            margin: '0 auto',
             borderRadius: '16px',
-            padding: '30px',
-            maxHeight: '80vh',
-            overflowY: 'auto'
+            padding: '20px'
           }}>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
+            <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+              <div style={{ fontSize: '40px' }}>✅</div>
               <h2 style={{ margin: 0, color: '#4CAF50' }}>Transaksi Berhasil!</h2>
-              <p style={{ color: '#666', fontSize: '12px' }}>{lastTransaction.invoice}</p>
             </div>
 
-            <div style={{ borderTop: '1px dashed #ddd', paddingTop: '15px', marginBottom: '15px' }}>
-              {lastTransaction.items.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                  <span>{item.name} x{item.qty}</span>
-                  <span>{formatRupiah(item.price * item.qty)}</span>
-                </div>
-              ))}
+            <div style={{ overflowX: 'auto' }}>
+              <ReceiptGenerator ref={receiptRef} data={kasirReceiptData} />
             </div>
 
-            <div style={{ borderTop: '1px dashed #ddd', paddingTop: '15px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span>Total:</span>
-                <span style={{ fontWeight: 'bold' }}>{formatRupiah(lastTransaction.total)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span>Bayar:</span>
-                <span>{formatRupiah(lastTransaction.payment)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span>Kembali:</span>
-                <span style={{ fontWeight: 'bold', color: '#4CAF50' }}>{formatRupiah(lastTransaction.change)}</span>
-              </div>
+            <div style={{ display: 'grid', gap: '10px', marginTop: '15px' }}>
+              <button
+                onClick={handleShareReceipt}
+                disabled={sharing}
+                style={{ padding: '14px', background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                📱 Share ke WhatsApp
+              </button>
+              <button
+                onClick={handleDownloadReceipt}
+                disabled={sharing}
+                style={{ padding: '14px', background: '#1976D2', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                💾 Download Struk
+              </button>
+              <button
+                onClick={handlePrintReceipt}
+                style={{ padding: '14px', background: '#607D8B', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                🖨️ Cetak Thermal
+              </button>
+              <button
+                onClick={() => setShowReceipt(false)}
+                style={{ padding: '12px', background: '#f5f5f5', color: '#333', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Tutup
+              </button>
             </div>
-
-            <button
-              onClick={() => setShowReceipt(false)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#1976D2',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                marginTop: '20px'
-              }}
-            >
-              Tutup
-            </button>
           </div>
         </div>
       )}
