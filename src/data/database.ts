@@ -74,6 +74,8 @@ export interface KunjunganRecord {
   idToko: string;        // Foreign key ke SalesToko
   tanggal: string;       // "1/10/2026, 19.59.17"
   tipe: 'Cash' | 'Credit';
+  uangDiterima?: number; // khusus Cash
+  kembalian?: number;    // khusus Cash
   total: number;
   items: {
     produkId: number;

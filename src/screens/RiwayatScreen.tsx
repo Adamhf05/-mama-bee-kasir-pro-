@@ -1,3 +1,5 @@
+import { TransactionRepo } from '../data/repositories/TransactionRepo';
+import { transactionToRecord } from '../utils/paymentUtils';
 import { useState, useEffect, useRef } from 'react';
 import { KunjunganRepo } from '../data/repositories/KunjunganRepo';
 import { TokoRepo } from '../data/repositories/TokoRepo';
@@ -11,6 +13,8 @@ interface TransaksiDetail {
   tokoAlamat: string;
   tanggal: string;
   tipe: 'Cash' | 'Credit';
+  uangDiterima?: number;
+  kembalian?: number;
   items: {
     produkId: number;
     namaProduk: string;
@@ -38,14 +42,19 @@ export default function RiwayatScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [kunjungan, toko] = await Promise.all([
+      const [kunjungan, toko, transaksiKasir] = await Promise.all([
         KunjunganRepo.getAll(),
-        TokoRepo.getAll()
+        TokoRepo.getAll(),
+        TransactionRepo.getAll()
       ]);
       const tokoMap = new Map(toko.map(t => [t.idToko, t.nama]));
-      const kunjunganWithNama = kunjungan.map(k => ({
+      const gabungan: (KunjunganRecord & { tokoNama?: string })[] = [
+        ...kunjungan,
+        ...transaksiKasir.map(transactionToRecord)
+      ];
+      const kunjunganWithNama = gabungan.map(k => ({
         ...k,
-        tokoNama: tokoMap.get(k.idToko) || k.idToko
+        tokoNama: tokoMap.get(k.idToko) || k.tokoNama || k.idToko
       }));
       kunjunganWithNama.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
       setKunjunganList(kunjunganWithNama);
@@ -77,6 +86,8 @@ export default function RiwayatScreen() {
       tokoAlamat: toko?.alamat || '',
       tanggal: kunjungan.tanggal,
       tipe: kunjungan.tipe,
+      uangDiterima: kunjungan.uangDiterima,
+      kembalian: kunjungan.kembalian,
       items: kunjungan.items,
       total: kunjungan.total
     });

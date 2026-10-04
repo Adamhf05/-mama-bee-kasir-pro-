@@ -192,6 +192,8 @@ export default function TokoScreen() {
       const kunjungan = {
         idToko: selectedToko!.idToko,
         tanggal: new Date().toLocaleString('id-ID'),
+        uangDiterima: uangDiterimaFinal,
+        kembalian: kembalianFinal,
         tipe: pembayaran,
         total: getTotal(),
         items: itemsForHistory
