@@ -17,6 +17,7 @@ interface ReceiptData {
   items: ReceiptItem[];
   total: number;
   catatan?: string;
+  pelanggan?: string;
   uangDiterima?: number;
   kembalian?: number;
 }
@@ -74,6 +75,7 @@ export const ReceiptGenerator = forwardRef<HTMLDivElement, ReceiptGeneratorProps
         {/* Info Transaksi */}
         <div style={{ marginBottom: '10px', fontSize: '11px' }}>
           <p style={{ margin: '2px 0' }}><strong>Tanggal:</strong> {data.tanggal}</p>
+          {data.pelanggan && <p style={{ margin: '2px 0' }}><strong>Pelanggan:</strong> {data.pelanggan}</p>}
           <p style={{ margin: '2px 0' }}><strong>Pembayaran:</strong> {data.tipe}</p>
         </div>
 

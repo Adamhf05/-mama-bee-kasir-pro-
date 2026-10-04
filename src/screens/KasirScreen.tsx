@@ -1,3 +1,5 @@
+import { CustomerRepo } from '../data/repositories/CustomerRepo';
+import type { Customer } from '../data/database';
 import { ReceiptGenerator } from '../components/ReceiptGenerator';
 import { generateReceiptImage, shareReceiptViaWhatsApp, downloadReceiptImage } from '../utils/receiptUtils';
 import { useState, useEffect, useRef } from 'react';
@@ -25,6 +27,12 @@ export function KasirScreen() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
   const [payment, setPayment] = useState(0);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+
+  useEffect(() => {
+    CustomerRepo.getAll().then(setCustomers);
+  }, []);
 
   useEffect(() => {
     loadProducts();
@@ -121,6 +129,7 @@ export function KasirScreen() {
     }
 
     const invoice = `MB-${Date.now()}`;
+    const pelanggan = customers.find(c => String(c.id) === selectedCustomerId);
     const transaction: Omit<Transaction, 'id'> = {
       invoice,
       items: cart.map(item => ({
@@ -132,7 +141,8 @@ export function KasirScreen() {
       total,
       payment,
       change,
-      createdAt: new Date()
+      createdAt: new Date(),
+      ...(pelanggan ? { customerId: String(pelanggan.id), customerName: pelanggan.nama } : {})
     };
 
     // Simpan transaksi
@@ -144,6 +154,7 @@ export function KasirScreen() {
     }
 
     setLastTransaction({ ...transaction, id: Date.now() } as Transaction);
+    setSelectedCustomerId('');
     setShowReceipt(true);
     setShowCheckout(false);
     setCart([]);
@@ -160,6 +171,7 @@ export function KasirScreen() {
         tokoNama: 'Kasir Umum',
         tokoId: lastTransaction.invoice,
         tokoAlamat: '-',
+        pelanggan: lastTransaction.customerName,
         tanggal: new Date(lastTransaction.createdAt).toLocaleString('id-ID'),
         tipe: 'Cash' as const,
         items: lastTransaction.items.map(it => ({
@@ -431,6 +443,13 @@ export function KasirScreen() {
                 </div>
               )}
 
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: textMuted, marginBottom: '6px' }}>👤 Pilih Pelanggan</label>
+                <select value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${border}`, background: card, color: text, fontSize: '16px' }}>
+                  <option value="">👤 Pelanggan Umum (Tanpa Nama)</option>
+                  {customers.map(c => (<option key={c.id} value={String(c.id)}>{c.nama}{c.telepon ? ' • ' + c.telepon : ''}</option>))}
+                </select>
+              </div>
               <button
                 onClick={handleCheckout}
                 disabled={payment < total}

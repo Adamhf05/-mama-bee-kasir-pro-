@@ -26,6 +26,8 @@ export interface Transaction {
   total: number;
   payment: number;
   change: number;
+  customerId?: string;   // id pelanggan (Kasir Umum)
+  customerName?: string; // nama pelanggan saat transaksi
   createdAt: Date;
 }
 
@@ -87,12 +89,22 @@ export interface KunjunganRecord {
   createdAt: Date;
 }
 
+// Pelanggan Kasir Umum (counter / warung)
+export interface Customer {
+  id?: number;
+  nama: string;
+  telepon?: string;
+  alamat?: string;
+  createdAt: Date;
+}
+
 export class MamaBeeDatabase extends Dexie {
   products!: Table<Product>;
   transactions!: Table<Transaction>;
   stores!: Table<Store>;
   salesToko!: Table<SalesToko>;
   kunjungan!: Table<KunjunganRecord>;
+  customers!: Table<Customer>;
 
   constructor() {
     super('mamabee-kasir-pro');
@@ -117,3 +129,13 @@ export class MamaBeeDatabase extends Dexie {
 }
 
 export const db = new MamaBeeDatabase();
+
+// Versi 3: tabel pelanggan + index customerId di transaksi
+db.version(3).stores({
+  products: '++id, name, category, price, stock',
+  transactions: '++id, invoice, total, createdAt, customerId',
+  stores: '++id, name',
+  salesToko: 'idToko, nama, folder',
+  kunjungan: '++id, idToko, tanggal, tipe',
+  customers: '++id, nama, telepon'
+});

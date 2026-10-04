@@ -9,7 +9,7 @@ export function transactionToRecord(t: Transaction): KunjunganRecord & { tokoNam
   return {
     id: -(t.id ?? 0),
     idToko: KASIR_ID,
-    tokoNama: KASIR_NAMA,
+    tokoNama: t.customerName ? t.customerName + ' (Kasir)' : KASIR_NAMA,
     tanggal: created.toLocaleString('id-ID'),
     tipe: 'Cash',
     total: t.total,

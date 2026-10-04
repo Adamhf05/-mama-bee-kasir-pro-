@@ -62,7 +62,7 @@ async function computeStats(): Promise<Stats> {
     for (const it of t.items) {
       qtyByName.set(it.name, (qtyByName.get(it.name) ?? 0) + it.qty);
     }
-    if (d) recent.push({ key: 'K' + t.id, type: 'KASIR', label: t.invoice, total: t.total, date: d });
+    if (d) recent.push({ key: 'K' + t.id, type: 'KASIR', label: t.customerName ? t.customerName : t.invoice, total: t.total, date: d });
     if (sameDay(d, now)) {
       trxKasir++;
       omzet += t.total;
