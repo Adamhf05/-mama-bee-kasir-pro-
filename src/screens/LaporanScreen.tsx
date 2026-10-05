@@ -784,6 +784,7 @@ export default function LaporanScreen() {
                   const allData = [
                     ...filteredKunjungan.map(k => ({
                       tanggal: k.tanggal,
+                      waktu: new Date(k.createdAt || k.tanggal).getTime() || 0,
                       toko: tokoList.find(t=>t.idToko===k.idToko)?.nama || k.idToko,
                       tipe: k.tipe,
                       items: k.items.map(i=>`${i.namaProduk}(${i.jumlah})`).join('; '),
@@ -793,6 +794,7 @@ export default function LaporanScreen() {
                     })),
                     ...kasirFiltered.map(t => ({
                       tanggal: new Date(t.createdAt).toLocaleString('id-ID'),
+                      waktu: new Date(t.createdAt).getTime() || 0,
                       toko: t.customerName || 'Kasir Umum',
                       tipe: 'Cash',
                       items: t.items.map(i=>`${i.name}(${i.qty})`).join('; '),
@@ -800,8 +802,10 @@ export default function LaporanScreen() {
                       diterima: t.payment,
                       kembalian: t.change
                     }))
-                  ].sort((a,b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+                  ].sort((a,b) => a.waktu - b.waktu);
 
+                  const adaNonCash = allData.some(r => r.tipe !== 'Cash');
+                  const esc = (v: unknown) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                   const w = window.open('', '_blank');
                   if (!w) { alert('Popup diblokir! Izinkan popup untuk save PDF.'); return; }
                   
@@ -809,14 +813,14 @@ export default function LaporanScreen() {
                   html += '<style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#1976D2;color:white}.header{text-align:center;margin-bottom:20px}.summary{margin-top:20px;padding:15px;background:#f5f5f5;border-radius:8px}</style>';
                   html += '</head><body>';
                   html += '<div class="header"><h1>MAMA BEE KASIR PRO</h1><h3>Laporan Penjualan Gabungan</h3><p>Periode: ' + (({ hari: 'Hari Ini', minggu: '7 Hari Terakhir', bulan: '30 Hari Terakhir', semua: 'Semua' } as Record<string, string>)[periode] || periode) + '</p></div>';
-                  html += '<table><thead><tr><th>Tanggal</th><th>Toko/Pelanggan</th><th>Tipe</th><th>Items</th><th>Total</th><th>Diterima</th><th>Kembali</th></tr></thead><tbody>';
+                  html += '<table><thead><tr><th>Tanggal</th><th>Toko/Pelanggan</th>' + (adaNonCash ? '<th>Tipe</th>' : '') + '<th>Items</th><th>Total</th><th>Diterima</th><th>Kembali</th></tr></thead><tbody>';
                   
                   for (const r of allData) {
                     html += '<tr>';
                     html += '<td>' + r.tanggal + '</td>';
-                    html += '<td>' + r.toko + '</td>';
-                    html += '<td>' + r.tipe + '</td>';
-                    html += '<td>' + r.items + '</td>';
+                    html += '<td>' + esc(r.toko) + '</td>';
+                    if (adaNonCash) html += '<td>' + r.tipe + '</td>';
+                    html += '<td>' + esc(r.items) + '</td>';
                     html += '<td>Rp ' + Number(r.total).toLocaleString('id-ID') + '</td>';
                     html += '<td>' + (r.diterima ? 'Rp '+Number(r.diterima).toLocaleString('id-ID') : '-') + '</td>';
                     html += '<td>' + (r.kembalian ? 'Rp '+Number(r.kembalian).toLocaleString('id-ID') : '-') + '</td>';
@@ -825,7 +829,7 @@ export default function LaporanScreen() {
                   
                   const totalOmzet = allData.reduce((s,r)=>s+Number(r.total),0);
                   html += '</tbody></table>';
-                  html += '<div class="summary"><strong>Total Transaksi:</strong> ' + allData.length + ' | <strong>Total Omzet:</strong> Rp ' + totalOmzet.toLocaleString('id-ID') + '</div>';
+                  html += '<div class="summary"><strong>Total Transaksi:</strong> ' + allData.length + ' | <strong>Total Omzet:</strong> Rp ' + totalOmzet.toLocaleString('id-ID') + (adaNonCash ? '' : ' | <strong>Pembayaran:</strong> Semua Cash') + '</div>';
                   html += '<script>window.onload=function(){window.print();}</script>';
                   html += '</body></html>';
                   
