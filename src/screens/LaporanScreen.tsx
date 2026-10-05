@@ -226,7 +226,7 @@ export default function LaporanScreen() {
   }
   const maxOmzetHari = Math.max(...omzetPerHari.map(d => d.omzet), 1);
 
-  const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID');
+  const formatRupiah = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
   const formatAngka = (n: number) => n.toLocaleString('id-ID');
 
   // ---- Export gabungan Kasir + Toko (mengikuti filter periode aktif) ----
@@ -830,6 +830,47 @@ export default function LaporanScreen() {
                   const totalOmzet = allData.reduce((s,r)=>s+Number(r.total),0);
                   html += '</tbody></table>';
                   html += '<div class="summary"><strong>Total Transaksi:</strong> ' + allData.length + ' | <strong>Total Omzet:</strong> Rp ' + totalOmzet.toLocaleString('id-ID') + (adaNonCash ? '' : ' | <strong>Pembayaran:</strong> Semua Cash') + '</div>';
+                                    // ---- Produk terlaris dan kurang laku (periode yang sama, Kasir + Toko) ----
+                  const qtyProduk = new Map<number, { qty: number; omzet: number }>();
+                  const tambahProduk = (id: number, qty: number, omzet: number) => {
+                    const cur = qtyProduk.get(id) ?? { qty: 0, omzet: 0 };
+                    qtyProduk.set(id, { qty: cur.qty + qty, omzet: cur.omzet + omzet });
+                  };
+                  filteredKunjungan.forEach(k => k.items.forEach(i => tambahProduk(i.produkId, i.jumlah, i.subtotal)));
+                  kasirFiltered.forEach(t => t.items.forEach(i => tambahProduk(i.productId, i.qty, i.price * i.qty)));
+
+                  const statProduk = produkList.map(p => {
+                    const st = qtyProduk.get(p.id as number) ?? { qty: 0, omzet: 0 };
+                    return { id: p.id as number, nama: p.name, unit: p.unit || 'Pcs', stok: p.stock, qty: st.qty, omzet: st.omzet };
+                  });
+                  const terlaris = statProduk
+                    .filter(p => p.qty > 0)
+                    .sort((a, b) => b.qty - a.qty || b.omzet - a.omzet)
+                    .slice(0, 5);
+                  const idTerlaris = new Set(terlaris.map(p => p.id));
+                  const kurangLaku = statProduk
+                    .filter(p => p.stok > 0 && !idTerlaris.has(p.id))
+                    .sort((a, b) => a.qty - b.qty || b.stok - a.stok)
+                    .slice(0, 5);
+
+                  const barisProduk = (list: typeof statProduk) =>
+                    list.map((p, i) =>
+                      '<tr><td>' + (i + 1) + '</td><td>' + esc(p.nama) + '</td>' +
+                      '<td style="text-align:right">' + p.qty + ' ' + esc(p.unit) + '</td>' +
+                      '<td style="text-align:right">Rp ' + p.omzet.toLocaleString('id-ID') + '</td>' +
+                      '<td style="text-align:right">' + p.stok + '</td></tr>'
+                    ).join('');
+                  const kepalaProduk = '<table><thead><tr><th>#</th><th>Produk</th><th>Terjual</th><th>Omzet</th><th>Stok</th></tr></thead><tbody>';
+
+                  html += '<h3 style="margin-top:25px">🏆 Produk Terlaris</h3>';
+                  html += terlaris.length === 0
+                    ? '<p>Belum ada penjualan pada periode ini.</p>'
+                    : kepalaProduk + barisProduk(terlaris) + '</tbody></table>';
+                  html += '<h3 style="margin-top:25px">📉 Produk Kurang Laku</h3>';
+                  html += kurangLaku.length === 0
+                    ? '<p>Tidak ada (semua produk yang masih punya stok masuk daftar terlaris).</p>'
+                    : kepalaProduk + barisProduk(kurangLaku) + '</tbody></table>';
+                  html += '<p style="font-size:11px;color:#666;margin-top:10px">Terlaris = 5 produk dengan jumlah terjual terbanyak. Kurang laku = produk yang masih punya stok dan terjual paling sedikit (di luar daftar terlaris). Data gabungan Kasir + Toko pada periode di atas.</p>';
                   html += '<script>window.onload=function(){window.print();}</script>';
                   html += '</body></html>';
                   
