@@ -229,27 +229,81 @@ export default function LaporanScreen() {
   const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID');
   const formatAngka = (n: number) => n.toLocaleString('id-ID');
 
+  // ---- Export gabungan Kasir + Toko (mengikuti filter periode aktif) ----
+  const inPeriodeExport = (d: Date) => {
+    if (periode === 'semua') return true;
+    const nowX = new Date();
+    if (periode === 'hari') return d.toDateString() === nowX.toDateString();
+    if (periode === 'minggu') return d >= new Date(nowX.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (periode === 'bulan') return d >= new Date(nowX.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return true;
+  };
+  const kasirFiltered = kasirList.filter(t => inPeriodeExport(new Date(t.createdAt)));
+  const jumlahExport = filteredKunjungan.length + kasirFiltered.length;
+
+  // Satu sel CSV: kutip digandakan, awalan = + - @ dinetralkan (aman untuk Excel)
+  const csvCell = (cell: string) => {
+    let v = String(cell);
+    if (/^[=+\-@]/.test(v)) v = "'" + v;
+    return '"' + v.replace(/"/g, '""') + '"';
+  };
+  const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   const handleExportCSV = () => {
     try {
-      const headers = ['Tanggal', 'Toko', 'Tipe', 'Total', 'Items'];
-      const rows = filteredKunjungan.map(k => {
+      const headers = ['Tanggal', 'Toko', 'Tipe', 'Total', 'Items', 'Uang Diterima', 'Kembalian'];
+      type ExportRec = {
+        waktu: number;
+        tanggal: string;
+        toko: string;
+        tipe: string;
+        total: number;
+        items: string;
+        diterima: string;
+        kembalian: string;
+      };
+      const tokoRecs: ExportRec[] = filteredKunjungan.map(k => {
         const toko = tokoList.find(t => t.idToko === k.idToko);
-        const items = k.items.map(i => i.namaProduk + '(' + i.jumlah + ')').join('; ');
-        return [k.tanggal, toko?.nama || k.idToko, k.tipe, k.total.toString(), items];
+        const adaUang = k.tipe === 'Cash' && k.uangDiterima !== undefined;
+        return {
+          waktu: new Date(k.createdAt || k.tanggal).getTime() || 0,
+          tanggal: k.tanggal,
+          toko: toko?.nama || k.idToko,
+          tipe: k.tipe,
+          total: k.total,
+          items: k.items.map(i => i.namaProduk + '(' + i.jumlah + ')').join('; '),
+          diterima: adaUang ? String(k.uangDiterima) : '',
+          kembalian: adaUang ? String(k.kembalian ?? 0) : ''
+        };
       });
+      const kasirRecs: ExportRec[] = kasirFiltered.map(t => ({
+        waktu: new Date(t.createdAt).getTime() || 0,
+        tanggal: new Date(t.createdAt).toLocaleString('id-ID'),
+        toko: t.customerName ? t.customerName : 'Kasir Umum',
+        tipe: 'Cash',
+        total: t.total,
+        items: t.items.map(i => i.name + '(' + i.qty + ')').join('; '),
+        diterima: String(t.payment),
+        kembalian: String(t.change)
+      }));
+      const rows = [...tokoRecs, ...kasirRecs]
+        .sort((a, b) => a.waktu - b.waktu)
+        .map(r => [r.tanggal, r.toko, r.tipe, r.total.toString(), r.items, r.diterima, r.kembalian]);
       
       const csvContent = [
         headers.join(','),
-        ...rows.map(r => r.map(cell => '"' + cell + '"').join(','))
+        ...rows.map(r => r.map(csvCell).join(','))
       ].join('\n');
       
       const tableRows = rows.map(r => 
         '<tr>' +
         '<td style="padding:8px;border:1px solid #ddd;font-size:12px;">' + r[0] + '</td>' +
-        '<td style="padding:8px;border:1px solid #ddd;font-size:12px;">' + r[1] + '</td>' +
+        '<td style="padding:8px;border:1px solid #ddd;font-size:12px;">' + escHtml(r[1]) + '</td>' +
         '<td style="padding:8px;border:1px solid #ddd;font-size:12px;">' + r[2] + '</td>' +
         '<td style="padding:8px;border:1px solid #ddd;font-size:12px;text-align:right;">Rp ' + parseInt(r[3]).toLocaleString('id-ID') + '</td>' +
-        '<td style="padding:8px;border:1px solid #ddd;font-size:12px;">' + r[4] + '</td>' +
+        '<td style="padding:8px;border:1px solid #ddd;font-size:12px;">' + escHtml(r[4]) + '</td>' +
+        '<td style="padding:8px;border:1px solid #ddd;font-size:12px;text-align:right;">' + (r[5] === '' ? '-' : 'Rp ' + parseInt(r[5]).toLocaleString('id-ID')) + '</td>' +
+        '<td style="padding:8px;border:1px solid #ddd;font-size:12px;text-align:right;">' + (r[6] === '' ? '-' : 'Rp ' + parseInt(r[6]).toLocaleString('id-ID')) + '</td>' +
         '</tr>'
       ).join('');
       
@@ -261,6 +315,8 @@ export default function LaporanScreen() {
         '<th style="padding:10px;border:1px solid #ddd;font-size:12px;">Tipe</th>' +
         '<th style="padding:10px;border:1px solid #ddd;font-size:12px;">Total</th>' +
         '<th style="padding:10px;border:1px solid #ddd;font-size:12px;">Items</th>' +
+        '<th style="padding:10px;border:1px solid #ddd;font-size:12px;">Uang Diterima</th>' +
+        '<th style="padding:10px;border:1px solid #ddd;font-size:12px;">Kembalian</th>' +
         '</tr></thead>' +
         '<tbody>' + tableRows + '</tbody>' +
         '</table>';
@@ -279,7 +335,7 @@ export default function LaporanScreen() {
         '<button id="copyCsvBtn" style="width:100%;padding:14px;background:#4CAF50;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">📋 Copy Data CSV</button>' +
         '<button id="closeModalBtn" style="width:100%;padding:14px;background:#1976D2;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">🔄 Tutup / Refresh</button>' +
         '</div>' +
-        '<textarea id="csvData" style="position:absolute;left:-9999px;">' + csvContent + '</textarea>' +
+        '<textarea id="csvData" style="position:absolute;left:-9999px;">' + csvContent.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</textarea>' +
         '</div>';
       
       document.body.appendChild(modal);
@@ -644,17 +700,17 @@ export default function LaporanScreen() {
 
       <button
         onClick={handleExportCSV}
-        disabled={filteredKunjungan.length === 0}
+        disabled={jumlahExport === 0}
         style={{
           width: '100%',
           padding: '15px',
-          background: filteredKunjungan.length === 0 ? '#ccc' : '#4CAF50',
+          background: jumlahExport === 0 ? '#ccc' : '#4CAF50',
           color: 'white',
           border: 'none',
           borderRadius: '8px',
           fontSize: '16px',
           fontWeight: 'bold',
-          cursor: filteredKunjungan.length === 0 ? 'not-allowed' : 'pointer',
+          cursor: jumlahExport === 0 ? 'not-allowed' : 'pointer',
           marginBottom: '20px'
         }}
       >
