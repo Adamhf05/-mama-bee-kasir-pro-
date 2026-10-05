@@ -808,7 +808,7 @@ export default function LaporanScreen() {
                   let html = '<html><head><title>Laporan Mama Bee</title>';
                   html += '<style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#1976D2;color:white}.header{text-align:center;margin-bottom:20px}.summary{margin-top:20px;padding:15px;background:#f5f5f5;border-radius:8px}</style>';
                   html += '</head><body>';
-                  html += '<div class="header"><h1>MAMA BEE KASIR PRO</h1><h3>Laporan Penjualan Gabungan</h3><p>Periode: ${periode.toUpperCase()}</p></div>';
+                  html += '<div class="header"><h1>MAMA BEE KASIR PRO</h1><h3>Laporan Penjualan Gabungan</h3><p>Periode: ' + (({ hari: 'Hari Ini', minggu: '7 Hari Terakhir', bulan: '30 Hari Terakhir', semua: 'Semua' } as Record<string, string>)[periode] || periode) + '</p></div>';
                   html += '<table><thead><tr><th>Tanggal</th><th>Toko/Pelanggan</th><th>Tipe</th><th>Items</th><th>Total</th><th>Diterima</th><th>Kembali</th></tr></thead><tbody>';
                   
                   for (const r of allData) {
