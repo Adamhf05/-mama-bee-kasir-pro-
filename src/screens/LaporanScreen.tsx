@@ -768,6 +768,76 @@ export default function LaporanScreen() {
         📥 Export Laporan (CSV)
       </button>
 
+              <button 
+                onClick={async () => {
+                  // Generate data laporan sama seperti handleExportCSV
+                  const inPeriode = (d: Date) => {
+                    if (periode === 'semua') return true;
+                    const now = new Date();
+                    if (periode === 'hari') return d.toDateString() === now.toDateString();
+                    if (periode === 'minggu') return d >= new Date(now.getTime() - 7*24*60*60*1000);
+                    if (periode === 'bulan') return d >= new Date(now.getTime() - 30*24*60*60*1000);
+                    return true;
+                  };
+                  
+                  const kasirFiltered = kasirList.filter(t => inPeriode(new Date(t.createdAt)));
+                  const allData = [
+                    ...filteredKunjungan.map(k => ({
+                      tanggal: k.tanggal,
+                      toko: tokoList.find(t=>t.idToko===k.idToko)?.nama || k.idToko,
+                      tipe: k.tipe,
+                      items: k.items.map(i=>`${i.namaProduk}(${i.jumlah})`).join('; '),
+                      total: k.total,
+                      diterima: (k.tipe==='Cash' && k.uangDiterima!==undefined) ? k.uangDiterima : '',
+                      kembalian: (k.tipe==='Cash' && k.kembalian!==undefined) ? k.kembalian : ''
+                    })),
+                    ...kasirFiltered.map(t => ({
+                      tanggal: new Date(t.createdAt).toLocaleString('id-ID'),
+                      toko: t.customerName || 'Kasir Umum',
+                      tipe: 'Cash',
+                      items: t.items.map(i=>`${i.name}(${i.qty})`).join('; '),
+                      total: t.total,
+                      diterima: t.payment,
+                      kembalian: t.change
+                    }))
+                  ].sort((a,b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+
+                  const w = window.open('', '_blank');
+                  if (!w) { alert('Popup diblokir! Izinkan popup untuk save PDF.'); return; }
+                  
+                  let html = '<html><head><title>Laporan Mama Bee</title>';
+                  html += '<style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#1976D2;color:white}.header{text-align:center;margin-bottom:20px}.summary{margin-top:20px;padding:15px;background:#f5f5f5;border-radius:8px}</style>';
+                  html += '</head><body>';
+                  html += '<div class="header"><h1>MAMA BEE KASIR PRO</h1><h3>Laporan Penjualan Gabungan</h3><p>Periode: ${periode.toUpperCase()}</p></div>';
+                  html += '<table><thead><tr><th>Tanggal</th><th>Toko/Pelanggan</th><th>Tipe</th><th>Items</th><th>Total</th><th>Diterima</th><th>Kembali</th></tr></thead><tbody>';
+                  
+                  for (const r of allData) {
+                    html += '<tr>';
+                    html += '<td>' + r.tanggal + '</td>';
+                    html += '<td>' + r.toko + '</td>';
+                    html += '<td>' + r.tipe + '</td>';
+                    html += '<td>' + r.items + '</td>';
+                    html += '<td>Rp ' + Number(r.total).toLocaleString('id-ID') + '</td>';
+                    html += '<td>' + (r.diterima ? 'Rp '+Number(r.diterima).toLocaleString('id-ID') : '-') + '</td>';
+                    html += '<td>' + (r.kembalian ? 'Rp '+Number(r.kembalian).toLocaleString('id-ID') : '-') + '</td>';
+                    html += '</tr>';
+                  }
+                  
+                  const totalOmzet = allData.reduce((s,r)=>s+Number(r.total),0);
+                  html += '</tbody></table>';
+                  html += '<div class="summary"><strong>Total Transaksi:</strong> ' + allData.length + ' | <strong>Total Omzet:</strong> Rp ' + totalOmzet.toLocaleString('id-ID') + '</div>';
+                  html += '<script>window.onload=function(){window.print();}</script>';
+                  html += '</body></html>';
+                  
+                  w.document.write(html);
+                  w.document.close();
+                }}
+                style={{ width: '100%', padding: '14px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}
+              >
+                🖨️ Save PDF / Cetak Laporan
+              </button>
+
+
       <div style={{ padding: '15px', background: '#E3F2FD', borderRadius: '8px', fontSize: '12px', color: '#1565C0' }}>
         <strong>💡 Tips:</strong>
         <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
