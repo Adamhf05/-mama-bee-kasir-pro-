@@ -290,10 +290,61 @@ export default function LaporanScreen() {
         .sort((a, b) => a.waktu - b.waktu)
         .map(r => [r.tanggal, r.toko, r.tipe, r.total.toString(), r.items, r.diterima, r.kembalian]);
       
-      const csvContent = [
+      const csvTransaksi = [
         headers.join(','),
         ...rows.map(r => r.map(csvCell).join(','))
       ].join('\n');
+
+      // ---- Rekap stok per produk (di bagian bawah CSV yang sama) ----
+      const lakuPerProduk = new Map<number, number>();
+      filteredKunjungan.forEach(k => {
+        k.items.forEach(i => lakuPerProduk.set(i.produkId, (lakuPerProduk.get(i.produkId) ?? 0) + i.jumlah));
+      });
+      kasirFiltered.forEach(t => {
+        t.items.forEach(i => lakuPerProduk.set(i.productId, (lakuPerProduk.get(i.productId) ?? 0) + i.qty));
+      });
+
+      const namaSales = (() => {
+        // Aplikasi memakai login PIN (tanpa nama), jadi nama sales diisi sekali lalu diingat
+        const tersimpan = localStorage.getItem('namaSales') || '';
+        const isi = window.prompt('Nama sales untuk rekap stok:', tersimpan);
+        const nama = (isi !== null ? isi : tersimpan).trim();
+        if (nama) localStorage.setItem('namaSales', nama);
+        return nama || 'Sales Umum';
+      })();
+
+      const tglNow = new Date();
+      const hariNow = tglNow.toLocaleDateString('id-ID', { weekday: 'long' });
+      const dd = String(tglNow.getDate()).padStart(2, '0');
+      const mm = String(tglNow.getMonth() + 1).padStart(2, '0');
+      // Nomor minggu ISO 8601 (awal minggu Senin)
+      const nomorMinggu = (() => {
+        const d = new Date(Date.UTC(tglNow.getFullYear(), tglNow.getMonth(), tglNow.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const awalTahun = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil(((d.getTime() - awalTahun.getTime()) / 86400000 + 1) / 7);
+      })();
+      const routeTanggal = hariNow + ', ' + dd + '/' + mm + '/' + tglNow.getFullYear() + ' (Minggu ' + (nomorMinggu % 2 === 0 ? 'Genap' : 'Ganjil') + ')';
+
+      const stokHeader = ['Jenis Laporan', 'Nama Sales', 'Route/Tanggal', 'Nama Produk', 'Satuan', 'Stok Awal', 'Stok Akhir', 'Total Laku'];
+      const stokRows = [...produkList]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(p => {
+          const laku = lakuPerProduk.get(p.id as number) ?? 0;
+          return [
+            csvCell('Rekap Stok'),
+            csvCell(namaSales),
+            csvCell(routeTanggal),
+            csvCell(p.name),
+            csvCell(p.unit || 'Pcs'),
+            String(p.stock + laku),
+            String(p.stock),
+            String(laku)
+          ].join(',');
+        });
+      const csvStok = [stokHeader.join(','), ...stokRows].join('\n');
+      const csvContent = csvTransaksi + '\n\n' + csvStok;
       
       const tableRows = rows.map(r => 
         '<tr>' +
