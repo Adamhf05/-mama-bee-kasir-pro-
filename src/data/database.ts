@@ -28,6 +28,7 @@ export interface Transaction {
   change: number;
   customerId?: string;   // id pelanggan (Kasir Umum)
   customerName?: string; // nama pelanggan saat transaksi
+  diarsipkan?: string;   // tanggal rekap (YYYY-MM-DD) bila hari sudah ditutup
   createdAt: Date;
 }
 
@@ -78,6 +79,7 @@ export interface KunjunganRecord {
   tipe: 'Cash' | 'Credit';
   uangDiterima?: number; // khusus Cash
   kembalian?: number;    // khusus Cash
+  diarsipkan?: string;   // tanggal rekap (YYYY-MM-DD) bila hari sudah ditutup
   total: number;
   items: {
     produkId: number;
@@ -98,6 +100,46 @@ export interface Customer {
   createdAt: Date;
 }
 
+// Catatan perubahan stok di luar penjualan (stok masuk / koreksi)
+export interface StockLogEntry {
+  id?: number;
+  productId: number;
+  productName: string;
+  qty: number; // positif = stok bertambah, negatif = berkurang
+  type: 'masuk' | 'koreksi';
+  createdAt: Date;
+}
+
+// Rekap harian permanen
+export interface DailyRecapProduk {
+  id: number;
+  nama: string;
+  satuan: string;
+  stokAwal: number | null;
+  stokAkhir: number | null;
+  laku: number;
+  masuk: number;
+  koreksi: number;
+  omzet: number;
+}
+
+export interface DailyRecap {
+  tanggal: string; // YYYY-MM-DD
+  dibuatPada: Date;
+  omzet: number;
+  hppTotal: number;
+  profit: number;
+  transaksiKasir: number;
+  kunjunganToko: number;
+  cashDiterima: number;
+  kembalian: number;
+  cashBersih: number;
+  piutang: number;
+  produk: DailyRecapProduk[];
+  pelanggan: Array<{ nama: string; transaksi: number; total: number }>;
+  toko: Array<{ idToko: string; nama: string; transaksi: number; total: number; cash: number; credit: number }>;
+}
+
 export class MamaBeeDatabase extends Dexie {
   products!: Table<Product>;
   transactions!: Table<Transaction>;
@@ -105,6 +147,8 @@ export class MamaBeeDatabase extends Dexie {
   salesToko!: Table<SalesToko>;
   kunjungan!: Table<KunjunganRecord>;
   customers!: Table<Customer>;
+  dailyRecaps!: Table<DailyRecap>;
+  stockLog!: Table<StockLogEntry>;
 
   constructor() {
     super('mamabee-kasir-pro');
@@ -138,4 +182,16 @@ db.version(3).stores({
   salesToko: 'idToko, nama, folder',
   kunjungan: '++id, idToko, tanggal, tipe',
   customers: '++id, nama, telepon'
+});
+
+// Versi 4: rekap harian permanen + catatan perubahan stok
+db.version(4).stores({
+  products: '++id, name, category, price, stock',
+  transactions: '++id, invoice, total, createdAt, customerId',
+  stores: '++id, name',
+  salesToko: 'idToko, nama, folder',
+  kunjungan: '++id, idToko, tanggal, tipe',
+  customers: '++id, nama, telepon',
+  dailyRecaps: 'tanggal',
+  stockLog: '++id, productId, createdAt'
 });

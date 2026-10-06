@@ -1,3 +1,4 @@
+import { StockLogRepo } from '../data/repositories/StockLogRepo';
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -148,9 +149,12 @@ export function ProdukScreen() {
     setSaving(true);
     try {
       if (editingId !== null) {
+        const stokLama = products.find(p => p.id === editingId)?.stock ?? 0;
         await ProductRepo.update(editingId, input);
+        await StockLogRepo.catat(editingId, input.name, input.stock - stokLama);
       } else {
-        await ProductRepo.add(input);
+        const idBaru = await ProductRepo.add(input);
+        await StockLogRepo.catat(idBaru, input.name, input.stock);
       }
       await load();
       closeForm();
