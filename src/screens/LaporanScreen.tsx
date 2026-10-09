@@ -165,20 +165,32 @@ export default function LaporanScreen() {
     };
   });
   
+  const lastSoldMs: Record<number, number> = {};
+  const catatTerjual = (id: number, qty: number, omzet: number, waktu: Date, label: string) => {
+    const st = produkStats[id];
+    if (!st) return;
+    st.totalQty += qty;
+    st.totalOmzet += omzet;
+    const ms = waktu.getTime();
+    if (!isNaN(ms) && (lastSoldMs[id] === undefined || ms > lastSoldMs[id])) {
+      lastSoldMs[id] = ms;
+      st.lastSold = label;
+    }
+  };
+
+  // Penjualan Toko
   kunjunganList.forEach(k => {
-    k.items.forEach(item => {
-      if (produkStats[item.produkId]) {
-        produkStats[item.produkId].totalQty += item.jumlah;
-        produkStats[item.produkId].totalOmzet += item.subtotal;
-        
-        const tanggalTransaksi = new Date(k.createdAt || k.tanggal);
-        if (!produkStats[item.produkId].lastSold || tanggalTransaksi > new Date(produkStats[item.produkId].lastSold!)) {
-          produkStats[item.produkId].lastSold = k.tanggal;
-        }
-      }
-    });
+    const waktu = new Date(k.createdAt || k.tanggal);
+    k.items.forEach(item => catatTerjual(item.produkId, item.jumlah, item.subtotal, waktu, k.tanggal));
   });
-  
+
+  // Penjualan Kasir Umum
+  kasirList.forEach(t => {
+    const waktu = new Date(t.createdAt);
+    const label = waktu.toLocaleString('id-ID');
+    t.items.forEach(item => catatTerjual(item.productId, item.qty, item.price * item.qty, waktu, label));
+  });
+
   const kategoriProduk = {
     SL: [] as ProdukStat[],
     SD: [] as ProdukStat[],
@@ -189,7 +201,7 @@ export default function LaporanScreen() {
   
   Object.values(produkStats).forEach(p => {
     const daysSinceLastSold = p.lastSold 
-      ? Math.floor((now.getTime() - new Date(p.lastSold).getTime()) / (1000 * 60 * 60 * 24))
+      ? Math.floor((now.getTime() - (lastSoldMs[p.produkId] ?? now.getTime())) / (1000 * 60 * 60 * 24))
       : 999;
     
     if (p.totalQty >= threshold.slMin) {
@@ -208,7 +220,7 @@ export default function LaporanScreen() {
   kategoriProduk.SL.sort((a, b) => b.totalQty - a.totalQty);
   kategoriProduk.SK.sort((a, b) => a.stokSekarang - b.stokSekarang);
   kategoriProduk.SD.sort((a, b) => b.stokSekarang - a.stokSekarang);
-  kategoriProduk.BPJ.sort((a, b) => new Date(b.lastSold!).getTime() - new Date(a.lastSold!).getTime());
+  kategoriProduk.BPJ.sort((a, b) => (lastSoldMs[b.produkId] ?? 0) - (lastSoldMs[a.produkId] ?? 0));
   kategoriProduk.TL.sort((a, b) => b.stokSekarang - a.stokSekarang);
 
   const omzetPerHari: { tanggal: string; omzet: number }[] = [];
@@ -872,6 +884,33 @@ export default function LaporanScreen() {
                     : kepalaProduk + barisProduk(kurangLaku) + '</tbody></table>';
                   html += '<p style="font-size:11px;color:#666;margin-top:10px">Terlaris = 5 produk dengan jumlah terjual terbanyak. Kurang laku = produk yang masih punya stok dan terjual paling sedikit (di luar daftar terlaris). Data gabungan Kasir + Toko pada periode di atas.</p>';
                   html += '<script>window.onload=function(){window.print();}</script>';
+                  // ---- Analisis performa produk (SL, SK, SD, BPJ, TL): sama dengan layar Laporan ----
+                  const hariSejak = (id: number): string => {
+                    const ms = lastSoldMs[id];
+                    if (ms === undefined) return 'belum pernah';
+                    const hari = Math.floor((now.getTime() - ms) / (1000 * 60 * 60 * 24));
+                    return hari <= 0 ? 'hari ini' : hari + ' hari lalu';
+                  };
+                  const kategoriHtml = (judul: string, ket: string, list: ProdukStat[]) => {
+                    let out = '<h4 style="margin:14px 0 4px 0">' + judul + ': ' + list.length + ' produk</h4>';
+                    out += '<p style="margin:0 0 4px 0;font-size:11px;color:#666">' + ket + '</p>';
+                    if (list.length === 0) return out + '<p style="margin:0">Tidak ada produk</p>';
+                    out += '<table><thead><tr><th>Produk</th><th>Terjual</th><th>Stok</th><th>Terakhir Terjual</th></tr></thead><tbody>';
+                    out += list.slice(0, 5).map(p =>
+                      '<tr><td>' + esc(p.namaProduk) + '</td><td style="text-align:right">' + p.totalQty +
+                      '</td><td style="text-align:right">' + p.stokSekarang + '</td><td>' + hariSejak(p.produkId) + '</td></tr>'
+                    ).join('');
+                    out += '</tbody></table>';
+                    if (list.length > 5) out += '<p style="margin:2px 0 0 0;font-size:11px;color:#666">+' + (list.length - 5) + ' produk lainnya</p>';
+                    return out;
+                  };
+                  html += '<h3 style="margin-top:25px">📦 Analisis Performa Produk</h3>';
+                  html += '<p style="font-size:11px;color:#666;margin:0">Seluruh riwayat penjualan (Kasir + Toko), sama dengan layar Laporan.</p>';
+                  html += kategoriHtml('🟢 SL (Stock Laku)', 'Terjual minimal ' + threshold.slMin + ' pcs', kategoriProduk.SL);
+                  html += kategoriHtml('🔴 SK (Stock Kurang)', 'Ada penjualan dan stok di bawah ' + threshold.skMax, kategoriProduk.SK);
+                  html += kategoriHtml('🟡 SD (Stock Diam)', 'Stok ada, tanpa penjualan minimal ' + threshold.sdDays + ' hari', kategoriProduk.SD);
+                  html += kategoriHtml('🟠 BPJ (Barang Pernah Jual)', 'Pernah terjual, tanpa penjualan minimal ' + threshold.bpjDays + ' hari', kategoriProduk.BPJ);
+                  html += kategoriHtml('⚫ TL (Tidak Laku)', 'Stok ada dan belum pernah terjual', kategoriProduk.TL);
                   html += '</body></html>';
                   
                   w.document.write(html);
