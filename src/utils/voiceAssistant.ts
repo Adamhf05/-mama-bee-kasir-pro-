@@ -19,16 +19,17 @@ export const startListening = async (
     }
 
     // Mulai listening dengan bahasa Indonesia
+    // Perbaikan: Sesuaikan parameter dengan tipe data plugin
     await SpeechRecognition.start({
       language: 'id-ID',
-      partialResults: true, // Hasil real-time saat bicara
-      popup: false,         // Tanpa popup bawaan Android
+      partialResults: true, 
+      popup: false,         
+      maxResults: 5         // Tambahkan batas hasil biar aman
     });
 
     // Listener untuk hasil suara
-    SpeechRecognition.addListener('speechResults', (result: VoiceResult) => {
+    const listener = SpeechRecognition.addListener('speechResults', (result: VoiceResult) => {
       if (result.matches && result.matches.length > 0) {
-        // Ambil teks pertama yang paling akurat
         const text = result.matches[0];
         onResult(text);
       }
@@ -50,7 +51,7 @@ export const startListening = async (
 export const stopListening = async (): Promise<void> => {
   try {
     await SpeechRecognition.stop();
-    SpeechRecognition.removeAllListeners();
+    await SpeechRecognition.removeAllListeners();
   } catch (error) {
     console.error('Gagal stop voice:', error);
   }
@@ -61,7 +62,6 @@ export const parseVoiceCommand = (text: string): { name?: string; qty?: number }
   const cleanText = text.toLowerCase().trim();
   
   // Pola: [Nama Produk] [Angka]
-  // Contoh: "kopi tiga", "alexander bold 2", "mie ayam 5 bungkus"
   const match = cleanText.match(/^(.+?)\s+(\d+|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)(?:\s+(?:pcs|bungkus|botol|kaleng|dus))?$/i);
   
   if (match) {
@@ -75,6 +75,5 @@ export const parseVoiceCommand = (text: string): { name?: string; qty?: number }
     return { name: match[1].trim(), qty };
   }
 
-  // Kalau cuma nama produk tanpa angka, default qty 1
   return { name: cleanText, qty: 1 };
 };
