@@ -1,0 +1,21 @@
+      popup: false,         
+      maxResults: 5
+    });
+
+    // PERBAIKAN 1: Hapus variabel 'listener' yang gak kepake
+    // Langsung panggil addListener tanpa simpan ke variabel
+    SpeechRecognition.addListener('speechResults', (result: VoiceResult) => {
+      if (result.matches && result.matches.length > 0) {
+        const text = result.matches[0];
+        onResult(text);
+      }
+    });
+
+    // Listener error
+    SpeechRecognition.addListener('speechError', (err: any) => {
+      console.error('Voice Error:', err);
+      onError?.(err);
+    });
+
+  } catch (error) {
+    console.error('Gagal memulai voice:', error);
