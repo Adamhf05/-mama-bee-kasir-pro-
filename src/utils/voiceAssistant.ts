@@ -19,16 +19,16 @@ export const startListening = async (
     }
 
     // Mulai listening dengan bahasa Indonesia
-    // Perbaikan: Sesuaikan parameter dengan tipe data plugin
     await SpeechRecognition.start({
       language: 'id-ID',
       partialResults: true, 
       popup: false,         
-      maxResults: 5         // Tambahkan batas hasil biar aman
+      maxResults: 5
     });
 
-    // Listener untuk hasil suara
-    const listener = SpeechRecognition.addListener('speechResults', (result: VoiceResult) => {
+    // PERBAIKAN 1: Hapus variabel 'listener' yang gak kepake
+    // Langsung panggil addListener tanpa simpan ke variabel
+    SpeechRecognition.addListener('speechResults', (result: VoiceResult) => {
       if (result.matches && result.matches.length > 0) {
         const text = result.matches[0];
         onResult(text);
