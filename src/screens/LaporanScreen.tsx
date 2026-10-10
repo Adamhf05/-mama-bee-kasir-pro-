@@ -1,3 +1,8 @@
+import { closeDay, recapToHtml } from '../utils/dailyClosing';
+import { DailyRecapRepo } from '../data/repositories/DailyRecapRepo';
+import type { DailyRecap } from '../data/database';
+import { StockLogRepo } from '../data/repositories/StockLogRepo';
+import { renderHtmlToImage, showImageOverlay } from '../utils/imageOverlay';
 import { TransactionRepo } from '../data/repositories/TransactionRepo';
 import type { Transaction } from '../data/database';
 import { useState, useEffect } from 'react';
@@ -36,6 +41,8 @@ export default function LaporanScreen() {
   const [loading, setLoading] = useState(true);
   const [kunjunganList, setKunjunganList] = useState<KunjunganRecord[]>([]);
   const [kasirList, setKasirList] = useState<Transaction[]>([]);
+  const [recaps, setRecaps] = useState<DailyRecap[]>([]);
+  const [menutup, setMenutup] = useState(false);
   const [tokoList, setTokoList] = useState<SalesToko[]>([]);
   const [produkList, setProdukList] = useState<Product[]>([]);
   
@@ -65,6 +72,7 @@ export default function LaporanScreen() {
       setTokoList(toko);
       setProdukList(produk);
       setKasirList(transaksiKasir);
+      DailyRecapRepo.getAll().then(setRecaps);
     } catch (error) {
       console.error('Error loading laporan:', error);
     } finally {
@@ -240,6 +248,39 @@ export default function LaporanScreen() {
 
   const formatRupiah = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
   const formatAngka = (n: number) => n.toLocaleString('id-ID');
+
+  // ---- Tutup Hari / Rekap Harian ----
+  const tampilkanRekap = async (r: DailyRecap) => {
+    try {
+      const gambar = await renderHtmlToImage(recapToHtml(r));
+      showImageOverlay(gambar, 'Rekap Harian ' + r.tanggal);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membuat gambar rekap');
+    }
+  };
+
+  const handleTutupHari = async () => {
+    if (menutup) return;
+    if (!window.confirm('Tutup hari?\n\nRekap omzet, HPP, profit, dan stok disimpan permanen. Transaksi yang belum ditutup diarsipkan dari daftar Riwayat. Data tidak dihapus dan data pelanggan/toko tidak berubah.')) return;
+    try {
+      setMenutup(true);
+      const hasil = await closeDay();
+      if (hasil.tanggal.length === 0) {
+        alert('Tidak ada transaksi yang perlu ditutup.');
+        return;
+      }
+      alert('Rekap tersimpan untuk ' + hasil.tanggal.join(', ') + '.\n' + hasil.jumlah + ' transaksi diarsipkan.');
+      await loadData();
+      const terbaru = await DailyRecapRepo.get(hasil.tanggal[hasil.tanggal.length - 1]);
+      if (terbaru) await tampilkanRekap(terbaru);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menutup hari: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setMenutup(false);
+    }
+  };
 
   // ---- Export gabungan Kasir + Toko (mengikuti filter periode aktif) ----
   const inPeriodeExport = (d: Date) => {
@@ -818,8 +859,8 @@ export default function LaporanScreen() {
 
                   const adaNonCash = allData.some(r => r.tipe !== 'Cash');
                   const esc = (v: unknown) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                  const w = window.open('', '_blank');
-                  if (!w) { alert('Popup diblokir! Izinkan popup untuk save PDF.'); return; }
+                  
+                  
                   
                   let html = '<html><head><title>Laporan Mama Bee</title>';
                   html += '<style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#1976D2;color:white}.header{text-align:center;margin-bottom:20px}.summary{margin-top:20px;padding:15px;background:#f5f5f5;border-radius:8px}</style>';
@@ -883,7 +924,28 @@ export default function LaporanScreen() {
                     ? '<p>Tidak ada (semua produk yang masih punya stok masuk daftar terlaris).</p>'
                     : kepalaProduk + barisProduk(kurangLaku) + '</tbody></table>';
                   html += '<p style="font-size:11px;color:#666;margin-top:10px">Terlaris = 5 produk dengan jumlah terjual terbanyak. Kurang laku = produk yang masih punya stok dan terjual paling sedikit (di luar daftar terlaris). Data gabungan Kasir + Toko pada periode di atas.</p>';
-                  html += '<script>window.onload=function(){window.print();}</script>';
+                  // ---- Stock Baru (SB): stok masuk pada periode ----
+                  const logMasuk = (await StockLogRepo.getAll()).filter(l => l.qty > 0 && inPeriode(new Date(l.createdAt)));
+                  const sbMap = new Map<number, { nama: string; qty: number; terakhir: number }>();
+                  for (const l of logMasuk) {
+                    const cur = sbMap.get(l.productId) ?? { nama: l.productName, qty: 0, terakhir: 0 };
+                    cur.qty += l.qty;
+                    cur.terakhir = Math.max(cur.terakhir, new Date(l.createdAt).getTime());
+                    sbMap.set(l.productId, cur);
+                  }
+                  const stokSekarang = new Map<number, number>(produkList.map(p => [p.id as number, p.stock] as [number, number]));
+                  const sbList = Array.from(sbMap.entries()).sort((a, b) => b[1].terakhir - a[1].terakhir).slice(0, 10);
+                  html += '<h3 style="margin-top:25px">📦 Stock Baru (SB): Stok Masuk</h3>';
+                  html += sbList.length === 0
+                    ? '<p>Belum ada stok masuk tercatat pada periode ini.</p>'
+                    : '<table><thead><tr><th>#</th><th>Produk</th><th>Masuk</th><th>Stok Sekarang</th><th>Terakhir Masuk</th></tr></thead><tbody>' +
+                      sbList.map(([id, v], i) =>
+                        '<tr><td>' + (i + 1) + '</td><td>' + esc(v.nama) + '</td><td style="text-align:right">+' + v.qty +
+                        '</td><td style="text-align:right">' + (stokSekarang.get(id) ?? '-') + '</td><td>' +
+                        new Date(v.terakhir).toLocaleString('id-ID') + '</td></tr>'
+                      ).join('') + '</tbody></table>';
+                  html += '<p style="font-size:11px;color:#666;margin-top:10px">SB = stok yang masuk lewat menu Produk (produk baru atau penambahan stok), tercatat sejak fitur ini aktif.</p>';
+                  
                   // ---- Analisis performa produk (SL, SK, SD, BPJ, TL): sama dengan layar Laporan ----
                   const hariSejak = (id: number): string => {
                     const ms = lastSoldMs[id];
@@ -913,14 +975,46 @@ export default function LaporanScreen() {
                   html += kategoriHtml('⚫ TL (Tidak Laku)', 'Stok ada dan belum pernah terjual', kategoriProduk.TL);
                   html += '</body></html>';
                   
-                  w.document.write(html);
-                  w.document.close();
+                  try { const imageData = await renderHtmlToImage(html); showImageOverlay(imageData, 'Laporan Penjualan'); } catch (err) { console.error(err); alert('Gagal membuat gambar laporan'); }
+                  
                 }}
                 style={{ width: '100%', padding: '14px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}
               >
-                🖨️ Save PDF / Cetak Laporan
+                🖨️ Laporan Gambar (Bagikan / Simpan)
               </button>
 
+
+      <div style={{ background: 'white', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #ddd' }}>
+        <h3 style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#333' }}>🔒 Tutup Hari & Rekap Harian</h3>
+        <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#666', lineHeight: 1.5 }}>
+          Menyimpan rekap omzet, HPP, profit, dan stok secara permanen, lalu mengarsipkan transaksi dari daftar Riwayat. Data tidak dihapus; pelanggan, toko, dan produk tidak berubah.
+        </p>
+        <button
+          onClick={handleTutupHari}
+          disabled={menutup}
+          style={{ width: '100%', padding: '14px', background: menutup ? '#9e9e9e' : '#6A1B9A', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: menutup ? 'not-allowed' : 'pointer' }}
+        >
+          {menutup ? '⏳ Memproses...' : '🔒 Tutup Hari & Buat Rekap'}
+        </button>
+        {recaps.length > 0 && (
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', marginBottom: '6px' }}>Rekap terakhir</div>
+            {recaps.slice(0, 7).map(r => (
+              <div key={r.tanggal} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 0', borderTop: '1px solid #eee', fontSize: '12px' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: '#333' }}>{r.tanggal}</div>
+                  <div style={{ color: '#666' }}>
+                    {r.transaksiKasir + r.kunjunganToko} transaksi • Omzet {formatRupiah(r.omzet)} • Profit {formatRupiah(r.profit)}
+                  </div>
+                </div>
+                <button onClick={() => tampilkanRekap(r)} style={{ background: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 12px', fontSize: '12px', cursor: 'pointer' }}>
+                  Lihat
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div style={{ padding: '15px', background: '#E3F2FD', borderRadius: '8px', fontSize: '12px', color: '#1565C0' }}>
         <strong>💡 Tips:</strong>

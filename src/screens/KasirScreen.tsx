@@ -1,3 +1,4 @@
+import { showImageOverlay } from '../utils/imageOverlay';
 // KASIR_V2_BERSIH: Kasir fokus transaksi (tanpa katalog visual)
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -206,32 +207,18 @@ export function KasirScreen() {
     }
   };
 
-  const handlePrintReceipt = () => {
+  const handlePrintReceipt = async () => {
     if (!receiptRef.current) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Popup diblokir! Izinkan popup untuk print.');
-      return;
+    try {
+      setSaving(true);
+      const imageData = await generateReceiptImage(receiptRef.current);
+      showImageOverlay(imageData, 'Struk Kasir');
+    } catch (error) {
+      console.error('Print error:', error);
+      alert('Gagal membuat gambar struk');
+    } finally {
+      setSaving(false);
     }
-    const content = receiptRef.current.innerHTML;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Struk</title>
-          <style>
-            @page { size: 58mm auto; margin: 0; }
-            body { width: 58mm; margin: 0; padding: 5mm; font-family: monospace; font-size: 10px; }
-            * { box-sizing: border-box; }
-            img { max-width: 100%; }
-          </style>
-        </head>
-        <body>${content}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
   };
 
   const inputBase = {
@@ -430,7 +417,7 @@ export function KasirScreen() {
                 💾 Download Struk
               </button>
               <button onClick={handlePrintReceipt} style={{ padding: '14px', background: '#607D8B', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>
-                ️ Cetak Thermal
+                ️ Cetak (Gambar Struk)
               </button>
               <button onClick={() => setShowReceipt(false)} style={{ padding: '12px', background: '#f5f5f5', color: '#333', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
                 Tutup

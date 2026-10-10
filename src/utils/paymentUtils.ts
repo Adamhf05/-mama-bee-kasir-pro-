@@ -22,6 +22,7 @@ export function transactionToRecord(t: Transaction): KunjunganRecord & { tokoNam
     })),
     createdAt: created,
     uangDiterima: t.payment,
-    kembalian: t.change
+    kembalian: t.change,
+    diarsipkan: t.diarsipkan
   };
 }

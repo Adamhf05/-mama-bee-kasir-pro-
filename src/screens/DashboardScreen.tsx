@@ -162,7 +162,7 @@ export default function DashboardScreen() {
         }}
       >
         <AppLogo size={120} style={{ boxShadow: `0 0 0 4px ${BRAND.yellow}, 0 4px 12px rgba(0,0,0,0.4)` }} />
-        <h1 style={{ margin: '14px 0 4px', fontSize: '22px' }}>{APP_NAME}</h1>
+        <h1 style={{ margin: '14px 0 4px', fontSize: '22px', color: 'white' }}>{APP_NAME}</h1>
         <div style={{ opacity: 0.85, fontSize: '13px' }}>{today}</div>
       </div>
 

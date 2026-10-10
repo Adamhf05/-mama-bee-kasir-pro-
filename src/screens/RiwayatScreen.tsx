@@ -33,6 +33,7 @@ export default function RiwayatScreen() {
   const [filterToko, setFilterToko] = useState<string>('Semua');
   const [filterTipe, setFilterTipe] = useState<string>('Semua');
   const [filterTanggal, setFilterTanggal] = useState<string>('');
+  const [tampilArsip, setTampilArsip] = useState<boolean>(false);
   const [showDetail, setShowDetail] = useState<TransaksiDetail | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +72,8 @@ export default function RiwayatScreen() {
     const matchToko = filterToko === 'Semua' || k.idToko === filterToko;
     const matchTipe = filterTipe === 'Semua' || k.tipe === filterTipe;
     const matchTanggal = !filterTanggal || k.tanggal.includes(filterTanggal);
-    return matchToko && matchTipe && matchTanggal;
+    const matchArsip = tampilArsip || !k.diarsipkan;
+    return matchToko && matchTipe && matchTanggal && matchArsip;
   });
 
   const totalTransaksi = filteredKunjungan.length;
@@ -214,6 +216,11 @@ export default function RiwayatScreen() {
           />
         </div>
       </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#666', margin: '0 0 12px 0' }}>
+        <input type="checkbox" checked={tampilArsip} onChange={(e) => setTampilArsip(e.target.checked)} />
+        Tampilkan arsip (hari yang sudah ditutup)
+      </label>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div>
