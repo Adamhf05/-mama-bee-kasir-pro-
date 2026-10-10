@@ -208,7 +208,7 @@ export default function LaporanScreen() {
       kategoriProduk.SL.push(p);
     } else if (p.stokSekarang < threshold.skMax && p.totalQty > 0) {
       kategoriProduk.SK.push(p);
-    } else if (p.totalQty === 0 && p.stokSekarang > 0 && daysSinceLastSold >= threshold.sdDays) {
+    } else if (p.totalQty > 0 && p.stokSekarang > 0 && daysSinceLastSold >= threshold.sdDays && (daysSinceLastSold < threshold.bpjDays || threshold.sdDays >= threshold.bpjDays)) {
       kategoriProduk.SD.push(p);
     } else if (p.totalQty > 0 && daysSinceLastSold >= threshold.bpjDays) {
       kategoriProduk.BPJ.push(p);
@@ -908,8 +908,8 @@ export default function LaporanScreen() {
                   html += '<p style="font-size:11px;color:#666;margin:0">Seluruh riwayat penjualan (Kasir + Toko), sama dengan layar Laporan.</p>';
                   html += kategoriHtml('🟢 SL (Stock Laku)', 'Terjual minimal ' + threshold.slMin + ' pcs', kategoriProduk.SL);
                   html += kategoriHtml('🔴 SK (Stock Kurang)', 'Ada penjualan dan stok di bawah ' + threshold.skMax, kategoriProduk.SK);
-                  html += kategoriHtml('🟡 SD (Stock Diam)', 'Stok ada, tanpa penjualan minimal ' + threshold.sdDays + ' hari', kategoriProduk.SD);
-                  html += kategoriHtml('🟠 BPJ (Barang Pernah Jual)', 'Pernah terjual, tanpa penjualan minimal ' + threshold.bpjDays + ' hari', kategoriProduk.BPJ);
+                  html += kategoriHtml('🟡 SD (Stock Diam)', 'Pernah terjual, stok masih ada, tanpa penjualan minimal ' + threshold.sdDays + ' hari', kategoriProduk.SD);
+                  html += kategoriHtml('🟠 BPJ (Barang Pernah Jual)', 'Pernah terjual, tanpa penjualan minimal ' + threshold.bpjDays + ' hari (di luar SD)', kategoriProduk.BPJ);
                   html += kategoriHtml('⚫ TL (Tidak Laku)', 'Stok ada dan belum pernah terjual', kategoriProduk.TL);
                   html += '</body></html>';
                   
