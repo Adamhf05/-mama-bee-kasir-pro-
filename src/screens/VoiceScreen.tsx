@@ -51,9 +51,62 @@ function wordsToNumbers(tokens: string[]): string[] {
   return out;
 }
 
+
+// ---- Pencarian produk dari ucapan: huruf, angka, romawi, sebagian nama, salah dengar ----
+const ROMAWI = new Map<string, number>([
+  ['i', 1], ['ii', 2], ['iii', 3], ['iv', 4], ['v', 5],
+  ['vi', 6], ['vii', 7], ['viii', 8], ['ix', 9], ['x', 10]
+]);
+
+// Kata perintah/pengisi yang bukan nama produk
+const KATA_PERINTAH = new Set([
+  'tambah', 'tambahkan', 'masukkan', 'masukin', 'beli', 'tolong', 'dong', 'ya', 'buat', 'mau',
+  'pesan', 'order', 'minta', 'catat', 'input', 'ke', 'keranjang', 'dan', 'sama', 'lalu', 'terus',
+  'juga', 'pcs', 'buah', 'biji', 'bungkus', 'pack', 'dus', 'kg', 'liter'
+]);
+
+const PESAN_OFFLINE =
+  'Tidak ada internet dan paket suara offline Bahasa Indonesia belum terpasang. ' +
+  'Pasang paket suara offline di pengaturan HP/Google, atau ketik perintah di kolom bawah.';
+
+// "2" atau "ii" menjadi 2 (null bila bukan angka)
+function parseQty(tok?: string): number | null {
+  if (!tok) return null;
+  if (isNum(tok)) return Number(tok);
+  const r = ROMAWI.get(tok);
+  return r === undefined ? null : r;
+}
+
+function ambilJumlah(tokens: string[]): number {
+  const angka = tokens.find(t => isNum(t));
+  if (angka) return Math.max(1, Number(angka));
+  const romawi = tokens.map(t => ROMAWI.get(t)).find(v => v !== undefined);
+  return romawi ?? 1;
+}
+
+// Samakan ejaan bunyi: "copy" menjadi "kopi", "ph" menjadi "f", huruf dobel dirapatkan
+const fon = (s: string) =>
+  s.replace(/ph/g, 'f').replace(/c/g, 'k').replace(/y/g, 'i').replace(/(.)\1+/g, '$1');
+
+// Jarak edit (Levenshtein)
+function jarak(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur: number[] = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
 type Wanted = { product: Product; qty: number };
 
-// Cari nama produk di kalimat, jumlah = angka sesudah (atau sebelum) nama produk
+// Cocokkan nama produk lengkap di kalimat; jumlah = angka/romawi sesudah atau sebelum nama
 function findItems(tokens: string[], products: Product[]): Wanted[] {
   const used: boolean[] = tokens.map(() => false);
   const found: Wanted[] = [];
@@ -62,16 +115,18 @@ function findItems(tokens: string[], products: Product[]): Wanted[] {
     const nameTokens = norm(p.name).split(' ').filter(Boolean);
     if (!nameTokens.length) continue;
     for (let i = 0; i <= tokens.length - nameTokens.length; i++) {
-      const match = nameTokens.every((nt, k) => tokens[i + k].toLowerCase() === nt && !used[i + k]);
+      const match = nameTokens.every((nt, k) => tokens[i + k] === nt && !used[i + k]);
       if (!match) continue;
       for (let k = 0; k < nameTokens.length; k++) used[i + k] = true;
       const after = i + nameTokens.length;
       let qty = 1;
-      if (isNum(tokens[after]) && !used[after]) {
-        qty = Number(tokens[after]);
+      const qAfter = parseQty(tokens[after]);
+      const qBefore = i > 0 ? parseQty(tokens[i - 1]) : null;
+      if (qAfter !== null && !used[after]) {
+        qty = qAfter;
         used[after] = true;
-      } else if (i > 0 && isNum(tokens[i - 1]) && !used[i - 1]) {
-        qty = Number(tokens[i - 1]);
+      } else if (qBefore !== null && !used[i - 1]) {
+        qty = qBefore;
         used[i - 1] = true;
       }
       found.push({ product: p, qty: Math.max(1, qty) });
@@ -81,11 +136,40 @@ function findItems(tokens: string[], products: Product[]): Wanted[] {
   return found;
 }
 
-// Cadangan: cocokkan sebagian nama ("kopi" untuk "Kopi Hitam")
+// Cadangan 1: sebagian nama ("kopi" untuk "Kopi Tubruk")
 function findPartial(tokens: string[], products: Product[]): Product[] {
   return products.filter(p =>
     norm(p.name).split(' ').some(nt => nt.length >= 3 && tokens.includes(nt))
   );
+}
+
+// Cadangan 2: salah dengar ("copy" untuk "kopi"); hanya kandidat terdekat
+function findFuzzy(tokens: string[], products: Product[]): Product[] {
+  const kata = tokens.filter(t => t.length >= 3 && !isNum(t) && !ROMAWI.has(t) && !KATA_PERINTAH.has(t));
+  if (!kata.length) return [];
+  const skor: Array<{ p: Product; d: number }> = [];
+  for (const p of products) {
+    let best = 99;
+    for (const nt of norm(p.name).split(' ').filter(x => x.length >= 3)) {
+      for (const k of kata) {
+        const d = jarak(fon(k), fon(nt));
+        const batas = Math.max(nt.length, k.length) >= 6 ? 2 : 1;
+        if (d <= batas && d < best) best = d;
+      }
+    }
+    if (best < 99) skor.push({ p, d: best });
+  }
+  if (!skor.length) return [];
+  const terbaik = Math.min(...skor.map(x => x.d));
+  return skor.filter(x => x.d === terbaik).map(x => x.p);
+}
+
+function pesanTidakKetemu(tokens: string[], products: Product[]): string {
+  const nama = tokens.filter(t => !isNum(t) && !ROMAWI.has(t) && !KATA_PERINTAH.has(t)).join(' ');
+  if (!nama) return 'Maaf, belum paham. Coba: "tambah kopi dua" atau "omzet hari ini".';
+  const contoh = products.slice(0, 5).map(p => p.name).join(', ');
+  return 'Produk "' + nama + '" belum terdaftar. Produk yang ada: ' + contoh +
+    (products.length > 5 ? ', ...' : '') + '. Tambahkan produk baru di menu Produk.';
 }
 
 async function todayReport() {
@@ -145,34 +229,48 @@ async function runCommand(raw: string): Promise<{ reply: string; goKasir: boolea
   }
 
   const products = await ProductRepo.getAll();
+  if (products.length === 0) {
+    return {
+      reply: 'Belum ada produk di database aplikasi ini. Tambahkan produk dulu di menu Produk.',
+      goKasir: false
+    };
+  }
 
   if (/\b(stok|stock|sisa)\b/.test(joined)) {
-    const p = findItems(tokens, products)[0]?.product ?? findPartial(tokens, products)[0];
-    if (!p) return { reply: 'Produk tidak ditemukan.', goKasir: false };
+    const exact = findItems(tokens, products)[0]?.product;
+    let kandidat: Product[] = exact ? [exact] : findPartial(tokens, products);
+    if (kandidat.length === 0) kandidat = findFuzzy(tokens, products);
+    if (kandidat.length === 0) return { reply: pesanTidakKetemu(tokens, products), goKasir: false };
+    if (kandidat.length > 1) {
+      return { reply: 'Maksudnya yang mana: ' + kandidat.map(c => c.name).join(', ') + '?', goKasir: false };
+    }
+    const p = kandidat[0];
     return { reply: `Stok ${p.name}: ${p.stock} ${p.unit || 'pcs'}.`, goKasir: false };
   }
 
   // Tambah ke keranjang
   let items = findItems(tokens, products);
-  if (!items.length) {
-    const cand = findPartial(tokens, products);
-    if (cand.length === 1) {
-      const n = tokens.find(t => isNum(t));
-      items = [{ product: cand[0], qty: n ? Math.max(1, Number(n)) : 1 }];
-    } else if (cand.length > 1) {
+  let tidakDikenali = '';
+  if (items.length) {
+    const dikenal = new Set<string>();
+    items.forEach(it => norm(it.product.name).split(' ').forEach(t => dikenal.add(t)));
+    tidakDikenali = tokens
+      .filter(t => t.length >= 3 && !isNum(t) && !ROMAWI.has(t) && !KATA_PERINTAH.has(t) && !dikenal.has(t))
+      .join(' ');
+  } else {
+    let cand = findPartial(tokens, products);
+    if (cand.length === 0) cand = findFuzzy(tokens, products);
+    if (cand.length > 1) {
       return { reply: 'Maksudnya yang mana: ' + cand.map(c => c.name).join(', ') + '?', goKasir: false };
     }
+    if (cand.length === 1) items = [{ product: cand[0], qty: ambilJumlah(tokens) }];
   }
-  if (!items.length) {
-    return {
-      reply: 'Maaf, belum paham. Coba: "tambah kopi dua" atau "omzet hari ini".',
-      goKasir: false
-    };
-  }
+  if (!items.length) return { reply: pesanTidakKetemu(tokens, products), goKasir: false };
 
   const added: string[] = [];
   const notes: string[] = [];
   const wanted: Array<{ productId: number; qty: number }> = [];
+  if (tidakDikenali) notes.push('Tidak dikenali: ' + tidakDikenali);
   for (const it of items) {
     const p = it.product;
     if (p.stock <= 0) { notes.push(`${p.name} stok habis`); continue; }
@@ -230,17 +328,41 @@ export default function VoiceScreen({ onGoKasir }: { onGoKasir: () => void }) {
         setStatus('Izin mikrofon ditolak. Izinkan di pengaturan HP.');
         return;
       }
+
+      // Offline: pakai jalur pengenalan di perangkat bila tersedia
+      const online = typeof navigator === 'undefined' ? true : navigator.onLine;
+      let pakaiOnDevice = false;
+      if (!online) {
+        try {
+          const cek = await SpeechRecognition.isOnDeviceRecognitionAvailable({ language: 'id-ID' });
+          pakaiOnDevice = cek.available;
+        } catch {
+          pakaiOnDevice = false;
+        }
+      }
+
       setListening(true);
-      setStatus('Mendengarkan... bicara sekarang');
+      setStatus(
+        online
+          ? 'Mendengarkan... bicara sekarang'
+          : pakaiOnDevice
+            ? 'Mendengarkan (offline, di perangkat)... bicara sekarang'
+            : 'Mendengarkan (offline)... bicara sekarang'
+      );
       const hasil = await SpeechRecognition.start({
         language: 'id-ID',
         maxResults: 3,
         partialResults: false,
-        popup: false
+        popup: false,
+        useOnDeviceRecognition: pakaiOnDevice
       });
       setListening(false);
-      setStatus('Tekan tombol, lalu bicara');
       const ucapan = hasil.matches?.[0] ?? '';
+      if (!ucapan) {
+        setStatus(online ? 'Tidak ada suara terdengar. Tekan tombol lalu bicara lagi.' : PESAN_OFFLINE);
+        return;
+      }
+      setStatus('Tekan tombol, lalu bicara');
       await handleCommand(ucapan);
     } catch (e) {
       setListening(false);
@@ -250,7 +372,8 @@ export default function VoiceScreen({ onGoKasir }: { onGoKasir: () => void }) {
           : typeof e === 'object' && e !== null && 'message' in e
             ? String((e as { message: unknown }).message)
             : String(e);
-      setStatus('Gagal mendengar: ' + pesan);
+      const offline = typeof navigator !== 'undefined' && !navigator.onLine;
+      setStatus(offline ? PESAN_OFFLINE + ' (' + pesan + ')' : 'Gagal mendengar: ' + pesan);
     }
   };
 
