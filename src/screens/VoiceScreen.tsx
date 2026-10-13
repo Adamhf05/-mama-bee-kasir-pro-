@@ -220,27 +220,37 @@ export default function VoiceScreen({ onGoKasir }: { onGoKasir: () => void }) {
     setHeard('');
     setReply('');
     try {
-      const avail = (await SpeechRecognition.available()) as unknown as { available?: boolean };
-      if (!avail.available) {
+      const { available } = await SpeechRecognition.available();
+      if (!available) {
         setStatus('Pengenalan suara tidak tersedia di perangkat ini. Pakai kolom ketik di bawah.');
         return;
       }
-      const perm = (await SpeechRecognition.requestPermissions()) as unknown as { speechRecognition?: string };
-      if (perm.speechRecognition !== 'granted') {
+      const izin = await SpeechRecognition.requestPermissions();
+      if (izin.speechRecognition !== 'granted') {
         setStatus('Izin mikrofon ditolak. Izinkan di pengaturan HP.');
         return;
       }
       setListening(true);
       setStatus('Mendengarkan... bicara sekarang');
-      const options = { language: 'id-ID', maxResults: 3, partialResults: false, popup: false };
-      const res = (await SpeechRecognition.start(options)) as unknown as { matches?: string[] };
+      const hasil = await SpeechRecognition.start({
+        language: 'id-ID',
+        maxResults: 3,
+        partialResults: false,
+        popup: false
+      });
       setListening(false);
       setStatus('Tekan tombol, lalu bicara');
-      const spoken = res.matches && res.matches[0] ? res.matches[0] : '';
-      await handleCommand(spoken);
+      const ucapan = hasil.matches?.[0] ?? '';
+      await handleCommand(ucapan);
     } catch (e) {
       setListening(false);
-      setStatus('Gagal mendengar: ' + (e instanceof Error ? e.message : String(e)));
+      const pesan =
+        e instanceof Error
+          ? e.message
+          : typeof e === 'object' && e !== null && 'message' in e
+            ? String((e as { message: unknown }).message)
+            : String(e);
+      setStatus('Gagal mendengar: ' + pesan);
     }
   };
 
