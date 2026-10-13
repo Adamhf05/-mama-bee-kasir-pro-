@@ -62,7 +62,7 @@ function findItems(tokens: string[], products: Product[]): Wanted[] {
     const nameTokens = norm(p.name).split(' ').filter(Boolean);
     if (!nameTokens.length) continue;
     for (let i = 0; i <= tokens.length - nameTokens.length; i++) {
-      const match = nameTokens.every((nt, k) => tokens[i + k] === nt && !used[i + k]);
+      const match = nameTokens.every((nt, k) => tokens[i + k].toLowerCase() === nt && !used[i + k]);
       if (!match) continue;
       for (let k = 0; k < nameTokens.length; k++) used[i + k] = true;
       const after = i + nameTokens.length;
